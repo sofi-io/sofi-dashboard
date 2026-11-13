@@ -1,6 +1,9 @@
 package cbf
 
-import "testing"
+import (
+	"net/url"
+	"testing"
+)
 
 func TestValidateCompetitionURL(t *testing.T) {
 	tests := []struct {
@@ -70,5 +73,42 @@ func TestParseCompetitionNameFallback(t *testing.T) {
 
 	if got != want {
 		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+func TestClubHistoryURL(t *testing.T) {
+	input := "https://www.cbf.com.br/futebol-brasileiro/times/campeonato-brasileiro/serie-b/2026/20023"
+
+	got, err := clubHistoryURL(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := input + "?tab=historico-de-partidas"
+
+	if got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+func TestClubHistoryURLPreservesQuery(t *testing.T) {
+	input := "https://www.cbf.com.br/futebol-brasileiro/times/serie-b/2026/20023?foo=bar"
+
+	got, err := clubHistoryURL(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	u, err := url.Parse(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if u.Query().Get("foo") != "bar" {
+		t.Fatal("existing query parameter was not preserved")
+	}
+
+	if u.Query().Get("tab") != "historico-de-partidas" {
+		t.Fatal("history tab was not added")
 	}
 }

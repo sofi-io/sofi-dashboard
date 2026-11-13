@@ -98,7 +98,7 @@ func (c *Client) DiscoverCompetition(
 					continue
 				}
 
-				html, err := c.FetchHTML(ctx, club.URL)
+				historyURL, err := clubHistoryURL(club.URL)
 				if err != nil {
 					results <- clubResult{
 						warning: &DiscoveryWarning{
@@ -109,6 +109,8 @@ func (c *Client) DiscoverCompetition(
 					}
 					continue
 				}
+
+				html, err := c.FetchHTML(ctx, historyURL)
 
 				matches, err := ParseMatches(club.URL, html)
 				if err != nil {
@@ -217,4 +219,17 @@ func parseCompetitionName(rawHTML string) string {
 	}
 
 	return ""
+}
+
+func clubHistoryURL(rawURL string) (string, error) {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return "", fmt.Errorf("parse club URL: %w", err)
+	}
+
+	query := u.Query()
+	query.Set("tab", "historico-de-partidas")
+	u.RawQuery = query.Encode()
+
+	return u.String(), nil
 }
