@@ -1,0 +1,8 @@
+.env
+.env.*
+!.env.example
+bin/
+web/node_modules/
+web/.next/
+coverage/git add .
+*.log

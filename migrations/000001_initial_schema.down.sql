@@ -1,0 +1,8 @@
+DROP TABLE IF EXISTS extractions;
+DROP TABLE IF EXISTS documents;
+DROP TABLE IF EXISTS match_sources;
+DROP TABLE IF EXISTS matches;
+DROP TABLE IF EXISTS clubs;
+DROP TABLE IF EXISTS seasons;
+DROP TABLE IF EXISTS competitions;
+DROP TABLE IF EXISTS organizations;
