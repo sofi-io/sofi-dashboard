@@ -11,9 +11,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/open-football-compliance/sofi-dashboard/internal/config"
-	"github.com/open-football-compliance/sofi-dashboard/internal/database"
-	"github.com/open-football-compliance/sofi-dashboard/internal/sources/cbf"
+	"github.com/sofi-io/sofi-dashboard/internal/competition"
+	"github.com/sofi-io/sofi-dashboard/internal/config"
+	"github.com/sofi-io/sofi-dashboard/internal/database"
+
+	"github.com/sofi-io/sofi-dashboard/internal/sources"
 )
 
 func main() {
@@ -60,10 +62,6 @@ func runDiscovery(args []string) error {
 		return fmt.Errorf("--max-concurrent-matches must be between 1 and 5")
 	}
 
-	if *source != "cbf" {
-		return fmt.Errorf("unsupported discovery source: %q", *source)
-	}
-
 	if *competitionURL == "" {
 		return fmt.Errorf("--competition-url is required")
 	}
@@ -79,24 +77,56 @@ func runDiscovery(args []string) error {
 	)
 	defer stop()
 
+	dryRun := flags.Bool(
+		"dry-run",
+		false,
+		"Run discovery without persisting results",
+	)
+
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Minute)
 	defer cancel()
 
-	client := cbf.NewClient()
+	discoverer, err := sources.NewDiscoverer(*source)
+	if err != nil {
+		return err
+	}
 
-	log.Printf("starting CBF competition discovery")
+	log.Printf("starting %s competition discovery", *source)
 	log.Printf("competition_url=%s", *competitionURL)
 
-	result, err := client.DiscoverCompetition(
+	result, err := discoverer.DiscoverCompetition(
 		ctx,
 		*competitionURL,
-		cbf.DiscoveryOptions{
-			MaxConcurrentClubFetches:  *maxConcurrent,
-			MaxConcurrentMatchFetches: *maxConcurrentMatches,
+		competition.DiscoveryOptions{
+			MaxConcurrentClubs:   *maxConcurrent,
+			MaxConcurrentMatches: *maxConcurrentMatches,
 		},
 	)
 	if err != nil {
 		return fmt.Errorf("discover competition: %w", err)
+	}
+
+	if !*dryRun {
+		cfg, err := config.Load()
+		if err != nil {
+			return fmt.Errorf("load config: %w", err)
+		}
+
+		db, err := database.Open(ctx, cfg.DatabaseURL)
+		if err != nil {
+			return fmt.Errorf("connect database: %w", err)
+		}
+		defer db.Close()
+
+		repository := database.NewCompetitionRepository(db)
+
+		if err := repository.SaveDiscovery(ctx, result); err != nil {
+			return fmt.Errorf("persist discovery: %w", err)
+		}
+
+		log.Printf("discovery persisted successfully")
+	} else {
+		log.Printf("dry-run enabled: skipping database persistence")
 	}
 
 	encoder := json.NewEncoder(os.Stdout)

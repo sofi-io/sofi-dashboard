@@ -11,3 +11,6 @@ coverage/
 /api
 /worker
 /discovery-*.json
+/migrate
+
+/tmp/

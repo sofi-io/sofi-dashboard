@@ -114,13 +114,25 @@ func (c *Client) DiscoverCompetition(
 				}
 
 				html, err := c.FetchHTML(ctx, historyURL)
+				if err != nil {
+					results <- clubResult{
+						warning: &DiscoveryWarning{
+							Stage:  "club_history",
+							ClubID: club.ExternalID,
+							URL:    historyURL,
+							Error:  err.Error(),
+						},
+					}
+					continue
+				}
 
 				matches, err := ParseMatches(club.URL, html)
 				if err != nil {
 					results <- clubResult{
 						warning: &DiscoveryWarning{
+							Stage:  "club_history",
 							ClubID: club.ExternalID,
-							URL:    club.URL,
+							URL:    historyURL,
 							Error:  err.Error(),
 						},
 					}
@@ -177,6 +189,10 @@ func (c *Client) DiscoverCompetition(
 		result.Matches,
 		matchConcurrency,
 	)
+
+	if err := ctx.Err(); err != nil {
+		return result, err
+	}
 
 	result.Matches = matches
 	result.Warnings = append(result.Warnings, warnings...)

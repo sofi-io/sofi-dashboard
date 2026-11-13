@@ -10,9 +10,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/open-football-compliance/sofi-dashboard/internal/config"
-	"github.com/open-football-compliance/sofi-dashboard/internal/database"
-	"github.com/open-football-compliance/sofi-dashboard/internal/httpapi"
+	"github.com/sofi-io/sofi-dashboard/internal/config"
+	"github.com/sofi-io/sofi-dashboard/internal/database"
+	"github.com/sofi-io/sofi-dashboard/internal/httpapi"
 )
 
 func main() {
