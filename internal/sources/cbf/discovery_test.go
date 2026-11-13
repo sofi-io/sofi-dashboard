@@ -1,6 +1,9 @@
 package cbf
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"testing"
 )
@@ -110,5 +113,49 @@ func TestClubHistoryURLPreservesQuery(t *testing.T) {
 
 	if u.Query().Get("tab") != "historico-de-partidas" {
 		t.Fatal("history tab was not added")
+	}
+}
+
+func TestFetchHTMLRetriesAfterTemporaryFailure(t *testing.T) {
+	attempts := 0
+
+	server := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			attempts++
+
+			if attempts < 3 {
+				http.Error(
+					w,
+					"temporary server error",
+					http.StatusServiceUnavailable,
+				)
+				return
+			}
+
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("<html>success</html>"))
+		},
+	))
+	defer server.Close()
+
+	client := &Client{
+		httpClient: server.Client(),
+	}
+
+	body, err := client.FetchHTML(
+		context.Background(),
+		server.URL,
+	)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if body != "<html>success</html>" {
+		t.Fatalf("unexpected body: %s", body)
+	}
+
+	if attempts != 3 {
+		t.Fatalf("got %d attempts, want 3", attempts)
 	}
 }

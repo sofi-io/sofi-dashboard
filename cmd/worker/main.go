@@ -46,8 +46,18 @@ func runDiscovery(args []string) error {
 		"Maximum concurrent club history requests",
 	)
 
+	maxConcurrentMatches := flags.Int(
+		"max-concurrent-matches",
+		3,
+		"Maximum concurrent match document requests",
+	)
+
 	if err := flags.Parse(args); err != nil {
 		return err
+	}
+
+	if *maxConcurrentMatches < 1 || *maxConcurrentMatches > 5 {
+		return fmt.Errorf("--max-concurrent-matches must be between 1 and 5")
 	}
 
 	if *source != "cbf" {
@@ -81,7 +91,8 @@ func runDiscovery(args []string) error {
 		ctx,
 		*competitionURL,
 		cbf.DiscoveryOptions{
-			MaxConcurrentClubFetches: *maxConcurrent,
+			MaxConcurrentClubFetches:  *maxConcurrent,
+			MaxConcurrentMatchFetches: *maxConcurrentMatches,
 		},
 	)
 	if err != nil {

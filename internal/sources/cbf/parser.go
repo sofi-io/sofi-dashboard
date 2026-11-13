@@ -171,8 +171,9 @@ func ParseDocuments(baseURL, rawHTML string) ([]Document, error) {
 
 		seen[fullURL] = true
 		documents = append(documents, Document{
-			Type: documentType,
-			URL:  fullURL,
+			Type:   documentType,
+			URL:    fullURL,
+			Status: DocumentDiscovered,
 		})
 	})
 

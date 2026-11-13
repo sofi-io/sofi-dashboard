@@ -12,13 +12,16 @@ import (
 const defaultClubConcurrency = 3
 
 type DiscoveryOptions struct {
-	MaxConcurrentClubFetches int
+	MaxConcurrentClubFetches  int
+	MaxConcurrentMatchFetches int
 }
 
 type DiscoveryWarning struct {
-	ClubID string `json:"club_id"`
-	URL    string `json:"url"`
-	Error  string `json:"error"`
+	Stage   string `json:"stage"`
+	ClubID  string `json:"club_id,omitempty"`
+	MatchID string `json:"match_id,omitempty"`
+	URL     string `json:"url"`
+	Error   string `json:"error"`
 }
 
 type DiscoveryResult struct {
@@ -163,6 +166,21 @@ func (c *Client) DiscoverCompetition(
 		return result, err
 	}
 
+	matchConcurrency := options.MaxConcurrentMatchFetches
+	if matchConcurrency <= 0 {
+		matchConcurrency = 3
+	}
+
+	matches, warnings := discoverMatchDocuments(
+		ctx,
+		c,
+		result.Matches,
+		matchConcurrency,
+	)
+
+	result.Matches = matches
+	result.Warnings = append(result.Warnings, warnings...)
+
 	sort.Slice(result.Clubs, func(i, j int) bool {
 		return result.Clubs[i].ExternalID < result.Clubs[j].ExternalID
 	})
@@ -173,6 +191,14 @@ func (c *Client) DiscoverCompetition(
 
 	sort.Slice(result.Warnings, func(i, j int) bool {
 		return result.Warnings[i].ClubID < result.Warnings[j].ClubID
+	})
+
+	sort.Slice(result.Warnings, func(i, j int) bool {
+		if result.Warnings[i].Stage != result.Warnings[j].Stage {
+			return result.Warnings[i].Stage < result.Warnings[j].Stage
+		}
+
+		return result.Warnings[i].MatchID < result.Warnings[j].MatchID
 	})
 
 	return result, nil
