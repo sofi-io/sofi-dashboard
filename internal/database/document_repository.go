@@ -158,14 +158,14 @@ func (r *DocumentRepository) MarkDownloaded(
 	tag, err := r.db.Exec(ctx, `
 		UPDATE documents
 		SET status = 'downloaded',
-		    content_type = $2,
-		    size_bytes = $3,
-		    sha256 = $4,
-		    storage_key = $5,
-		    downloaded_at = now(),
-		    download_started_at = NULL,
+			content_type = $3,
+			size_bytes = $4,
+			sha256 = $5,
+			storage_key = $6,
+			downloaded_at = now(),
+			download_started_at = NULL,
 			download_token = NULL,
-		    last_error = NULL
+			last_error = NULL
 		WHERE id = $1
 			AND status = 'downloading'
 			AND download_token = $2

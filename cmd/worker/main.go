@@ -14,8 +14,20 @@ import (
 	"github.com/sofi-io/sofi-dashboard/internal/competition"
 	"github.com/sofi-io/sofi-dashboard/internal/config"
 	"github.com/sofi-io/sofi-dashboard/internal/database"
-
+	"github.com/sofi-io/sofi-dashboard/internal/document"
+	"github.com/sofi-io/sofi-dashboard/internal/processing"
+	"github.com/sofi-io/sofi-dashboard/internal/sofi"
 	"github.com/sofi-io/sofi-dashboard/internal/sources"
+	"github.com/sofi-io/sofi-dashboard/internal/storage"
+)
+
+const (
+	workerBatchSize    = 5
+	workerPollInterval = 15 * time.Second
+	workerLease        = 5 * time.Minute
+
+	extractionBatchSize = 5
+	extractionLease     = 5 * time.Minute
 )
 
 func main() {
@@ -166,14 +178,165 @@ func runWorker() error {
 	}
 	defer db.Close()
 
+	store, err := storage.NewFilesystemStorage(
+		cfg.DocumentStoragePath,
+	)
+	if err != nil {
+		return fmt.Errorf("initialize document storage: %w", err)
+	}
+
+	downloader, err := document.NewDownloader(
+		store,
+		document.DownloaderConfig{
+			Timeout:     30 * time.Second,
+			MaxBytes:    20 << 20,
+			MaxAttempts: 3,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("initialize downloader: %w", err)
+	}
+
+	repository := database.NewDocumentRepository(db)
+
+	processor, err := processing.NewDocumentProcessor(
+		repository,
+		downloader,
+		processing.ProcessorConfig{
+			BatchSize: workerBatchSize,
+			Lease:     workerLease,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("initialize processor: %w", err)
+	}
+
+	if cfg.SOFIAPIBaseURL == "" {
+		return fmt.Errorf("SOFI_API_BASE_URL is required")
+	}
+
+	if cfg.SOFIAPIKey == "" {
+		return fmt.Errorf("SOFI_API_KEY is required")
+	}
+
+	sofiClient, err := sofi.NewClient(
+		cfg.SOFIAPIBaseURL,
+		cfg.SOFIAPIKey,
+		nil,
+	)
+	if err != nil {
+		return fmt.Errorf("initialize SOFI API client: %w", err)
+	}
+
+	extractionRepository := database.NewExtractionRepository(db)
+
+	dispatcher, err := processing.NewExtractionDispatcher(
+		extractionRepository,
+		store,
+		sofiClient,
+		processing.ExtractionDispatcherConfig{
+			BatchSize: extractionBatchSize,
+			Lease:     extractionLease,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("initialize extraction dispatcher: %w", err)
+	}
+
 	log.Printf(
 		"SOFI Dashboard worker started (environment=%s)",
 		cfg.Environment,
 	)
-	log.Printf("worker is idle; waiting for jobs")
+	log.Printf(
+		"document storage: %s",
+		cfg.DocumentStoragePath,
+	)
+	log.Printf(
+		"batch_size=%d poll_interval=%s",
+		workerBatchSize,
+		workerPollInterval,
+	)
 
-	<-ctx.Done()
+	for {
+		if err := ctx.Err(); err != nil {
+			break
+		}
 
-	log.Printf("shutdown signal received; stopping worker")
+		// 1. Download discovered documents.
+		downloaded, err := processor.ProcessBatch(ctx)
+
+		if ctx.Err() != nil {
+			break
+		}
+
+		if err != nil {
+			log.Printf("document processing error: %v", err)
+		}
+
+		if downloaded > 0 {
+			log.Printf(
+				"document batch completed: processed=%d",
+				downloaded,
+			)
+		}
+
+		// 2. Create extraction tasks for downloaded documents.
+		created, err := extractionRepository.CreatePending(
+			ctx,
+			extractionBatchSize,
+		)
+
+		if ctx.Err() != nil {
+			break
+		}
+
+		if err != nil {
+			log.Printf("create pending extractions error: %v", err)
+		}
+
+		if created > 0 {
+			log.Printf(
+				"extraction tasks created: count=%d",
+				created,
+			)
+		}
+
+		// 3. Submit pending extractions to SOFI API.
+		dispatched, err := dispatcher.ProcessBatch(ctx)
+
+		if ctx.Err() != nil {
+			break
+		}
+
+		if err != nil {
+			log.Printf("extraction dispatch error: %v", err)
+		}
+
+		if dispatched > 0 {
+			log.Printf(
+				"extraction dispatch completed: submitted=%d",
+				dispatched,
+			)
+		}
+
+		// 4. Immediately continue if either queue was full.
+		if downloaded == workerBatchSize ||
+			created == extractionBatchSize ||
+			dispatched == extractionBatchSize {
+			continue
+		}
+
+		// 5. Wait before polling again.
+		timer := time.NewTimer(workerPollInterval)
+
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+
+		case <-timer.C:
+		}
+	}
+
+	log.Printf("worker shutdown completed")
 	return nil
 }

@@ -6,16 +6,17 @@ import (
 )
 
 type Config struct {
-	Environment       string
-	APIAddr           string
-	DatabaseURL       string
-	SOFIAPIBaseURL    string
-	SOFIAPIKey        string
-	ObjectStorageHost string
-	ObjectStorageBuck string
-	ObjectStorageUser string
-	ObjectStoragePass string
-	ObjectStorageSSL  bool
+	Environment         string
+	APIAddr             string
+	DatabaseURL         string
+	SOFIAPIBaseURL      string
+	SOFIAPIKey          string
+	ObjectStorageHost   string
+	ObjectStorageBuck   string
+	ObjectStorageUser   string
+	ObjectStoragePass   string
+	ObjectStorageSSL    bool
+	DocumentStoragePath string
 }
 
 func Load() (Config, error) {
@@ -30,6 +31,10 @@ func Load() (Config, error) {
 		ObjectStorageUser: os.Getenv("OBJECT_STORAGE_ACCESS_KEY"),
 		ObjectStoragePass: os.Getenv("OBJECT_STORAGE_SECRET_KEY"),
 		ObjectStorageSSL:  getEnv("OBJECT_STORAGE_USE_SSL", "false") == "true",
+		DocumentStoragePath: getEnv(
+			"DOCUMENT_STORAGE_PATH",
+			"./data/documents",
+		),
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL is required")

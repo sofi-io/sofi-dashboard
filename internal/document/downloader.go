@@ -27,6 +27,7 @@ type DownloaderConfig struct {
 	MaxBytes     int64
 	MaxAttempts  int
 	InitialDelay time.Duration
+	HTTPClient   *http.Client
 }
 
 type DownloadedDocument struct {
@@ -69,10 +70,16 @@ func NewDownloader(
 		return nil, fmt.Errorf("max attempts cannot exceed 5")
 	}
 
-	return &Downloader{
-		client: &http.Client{
+	client := config.HTTPClient
+
+	if client == nil {
+		client = &http.Client{
 			Timeout: config.Timeout,
-		},
+		}
+	}
+
+	return &Downloader{
+		client:  client,
 		storage: store,
 		config:  config,
 	}, nil
