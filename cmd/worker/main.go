@@ -28,6 +28,9 @@ const (
 
 	extractionBatchSize = 5
 	extractionLease     = 5 * time.Minute
+
+	extractionPollInterval  = 15 * time.Second
+	extractionRetryInterval = 30 * time.Second
 )
 
 func main() {
@@ -243,6 +246,20 @@ func runWorker() error {
 		return fmt.Errorf("initialize extraction dispatcher: %w", err)
 	}
 
+	poller, err := processing.NewExtractionPoller(
+		extractionRepository,
+		sofiClient,
+		processing.ExtractionPollerConfig{
+			BatchSize:     extractionBatchSize,
+			Lease:         extractionLease,
+			PollInterval:  extractionPollInterval,
+			RetryInterval: extractionRetryInterval,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("initialize extraction poller: %w", err)
+	}
+
 	log.Printf(
 		"SOFI Dashboard worker started (environment=%s)",
 		cfg.Environment,
@@ -302,14 +319,17 @@ func runWorker() error {
 		}
 
 		// 3. Submit pending extractions to SOFI API.
-		dispatched, err := dispatcher.ProcessBatch(ctx)
+		dispatched, dispatchErr := dispatcher.ProcessBatch(ctx)
 
 		if ctx.Err() != nil {
 			break
 		}
 
-		if err != nil {
-			log.Printf("extraction dispatch error: %v", err)
+		if dispatchErr != nil {
+			log.Printf(
+				"extraction dispatch error: %v",
+				dispatchErr,
+			)
 		}
 
 		if dispatched > 0 {
@@ -319,10 +339,32 @@ func runWorker() error {
 			)
 		}
 
-		// 4. Immediately continue if either queue was full.
+		// 4. Poll submitted extractions.
+		polled, pollErr := poller.ProcessBatch(ctx)
+
+		if ctx.Err() != nil {
+			break
+		}
+
+		if pollErr != nil {
+			log.Printf(
+				"extraction polling error: %v",
+				pollErr,
+			)
+		}
+
+		if polled > 0 {
+			log.Printf(
+				"extraction polling completed: processed=%d",
+				polled,
+			)
+		}
+
+		// 5. Immediately continue if either queue was full.
 		if downloaded == workerBatchSize ||
 			created == extractionBatchSize ||
-			dispatched == extractionBatchSize {
+			dispatched == extractionBatchSize ||
+			polled == extractionBatchSize {
 			continue
 		}
 

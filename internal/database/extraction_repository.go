@@ -3,10 +3,12 @@ package database
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -36,8 +38,261 @@ type ExtractionRepository struct {
 	db *pgxpool.Pool
 }
 
+type ExtractionListFilter struct {
+	Status   string
+	Season   string
+	Provider string
+	Limit    int
+	Offset   int
+}
+
+type ExtractionListItem struct {
+	ID                   string     `json:"id"`
+	DocumentID           string     `json:"document_id"`
+	Provider             string     `json:"provider"`
+	ExternalExtractionID *string    `json:"external_extraction_id"`
+	Status               string     `json:"status"`
+	OriginalFilename     *string    `json:"original_filename"`
+	Season               *string    `json:"season"`
+	Competition          *string    `json:"competition"`
+	HomeClub             *string    `json:"home_club"`
+	AwayClub             *string    `json:"away_club"`
+	KickoffAt            *time.Time `json:"kickoff_at"`
+	ErrorMessage         *string    `json:"error_message"`
+	CreatedAt            time.Time  `json:"created_at"`
+	SubmittedAt          *time.Time `json:"submitted_at"`
+	CompletedAt          *time.Time `json:"completed_at"`
+}
+
+type ExtractionDetail struct {
+	ExtractionListItem
+	RawResult json.RawMessage `json:"raw_result"`
+}
+
 func NewExtractionRepository(db *pgxpool.Pool) *ExtractionRepository {
 	return &ExtractionRepository{db: db}
+}
+
+// List retrieves extractions with optional filters and pagination.
+func (r *ExtractionRepository) List(
+	ctx context.Context,
+	filter ExtractionListFilter,
+) ([]ExtractionListItem, int64, error) {
+	if r == nil || r.db == nil {
+		return nil, 0, fmt.Errorf(
+			"extraction repository is not initialized",
+		)
+	}
+
+	if filter.Limit == 0 {
+		filter.Limit = 20
+	}
+
+	if filter.Limit < 1 || filter.Limit > 100 {
+		return nil, 0, fmt.Errorf(
+			"limit must be between 1 and 100",
+		)
+	}
+
+	if filter.Offset < 0 {
+		return nil, 0, fmt.Errorf(
+			"offset cannot be negative",
+		)
+	}
+
+	filter.Status = strings.TrimSpace(filter.Status)
+	filter.Season = strings.TrimSpace(filter.Season)
+	filter.Provider = strings.TrimSpace(filter.Provider)
+
+	var total int64
+
+	err := r.db.QueryRow(ctx, `
+        SELECT COUNT(*)
+        FROM extractions e
+        JOIN documents d ON d.id = e.document_id
+        LEFT JOIN matches m ON m.id = d.match_id
+        LEFT JOIN seasons s ON s.id = m.season_id
+        LEFT JOIN competitions c ON c.id = s.competition_id
+        WHERE ($1 = '' OR e.status = $1)
+          AND ($2 = '' OR s.name = $2)
+          AND ($3 = '' OR e.provider = $3)
+    `,
+		filter.Status,
+		filter.Season,
+		filter.Provider,
+	).Scan(&total)
+
+	if err != nil {
+		return nil, 0, fmt.Errorf(
+			"count extractions: %w",
+			err,
+		)
+	}
+
+	rows, err := r.db.Query(ctx, `
+        SELECT
+            e.id,
+            e.document_id,
+            e.provider,
+            e.external_extraction_id,
+            e.status,
+            d.original_filename,
+            s.name,
+            c.name,
+            home.name,
+            away.name,
+            m.kickoff_at,
+            e.error_message,
+            e.created_at,
+            e.submitted_at,
+            e.completed_at
+        FROM extractions e
+        JOIN documents d ON d.id = e.document_id
+        LEFT JOIN matches m ON m.id = d.match_id
+        LEFT JOIN seasons s ON s.id = m.season_id
+        LEFT JOIN competitions c ON c.id = s.competition_id
+        LEFT JOIN clubs home ON home.id = m.home_club_id
+        LEFT JOIN clubs away ON away.id = m.away_club_id
+        WHERE ($1 = '' OR e.status = $1)
+          AND ($2 = '' OR s.name = $2)
+          AND ($3 = '' OR e.provider = $3)
+        ORDER BY e.created_at DESC, e.id DESC
+        LIMIT $4 OFFSET $5
+    `,
+		filter.Status,
+		filter.Season,
+		filter.Provider,
+		filter.Limit,
+		filter.Offset,
+	)
+
+	if err != nil {
+		return nil, 0, fmt.Errorf(
+			"list extractions: %w",
+			err,
+		)
+	}
+	defer rows.Close()
+
+	items := make([]ExtractionListItem, 0)
+
+	for rows.Next() {
+		var item ExtractionListItem
+
+		err := rows.Scan(
+			&item.ID,
+			&item.DocumentID,
+			&item.Provider,
+			&item.ExternalExtractionID,
+			&item.Status,
+			&item.OriginalFilename,
+			&item.Season,
+			&item.Competition,
+			&item.HomeClub,
+			&item.AwayClub,
+			&item.KickoffAt,
+			&item.ErrorMessage,
+			&item.CreatedAt,
+			&item.SubmittedAt,
+			&item.CompletedAt,
+		)
+
+		if err != nil {
+			return nil, 0, fmt.Errorf(
+				"scan extraction: %w",
+				err,
+			)
+		}
+
+		items = append(items, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf(
+			"iterate extractions: %w",
+			err,
+		)
+	}
+
+	return items, total, nil
+}
+
+// GetByID retrieves an extraction and its complete stored result.
+func (r *ExtractionRepository) GetByID(
+	ctx context.Context,
+	id string,
+) (ExtractionDetail, error) {
+	if r == nil || r.db == nil {
+		return ExtractionDetail{}, fmt.Errorf(
+			"extraction repository is not initialized",
+		)
+	}
+
+	if strings.TrimSpace(id) == "" {
+		return ExtractionDetail{}, fmt.Errorf(
+			"extraction ID is required",
+		)
+	}
+
+	var item ExtractionDetail
+
+	err := r.db.QueryRow(ctx, `
+        SELECT
+            e.id,
+            e.document_id,
+            e.provider,
+            e.external_extraction_id,
+            e.status,
+            d.original_filename,
+            s.name,
+            c.name,
+            home.name,
+            away.name,
+            m.kickoff_at,
+            e.error_message,
+            e.created_at,
+            e.submitted_at,
+            e.completed_at,
+            e.raw_result
+        FROM extractions e
+        JOIN documents d ON d.id = e.document_id
+        LEFT JOIN matches m ON m.id = d.match_id
+        LEFT JOIN seasons s ON s.id = m.season_id
+        LEFT JOIN competitions c ON c.id = s.competition_id
+        LEFT JOIN clubs home ON home.id = m.home_club_id
+        LEFT JOIN clubs away ON away.id = m.away_club_id
+        WHERE e.id = $1
+    `, id).Scan(
+		&item.ID,
+		&item.DocumentID,
+		&item.Provider,
+		&item.ExternalExtractionID,
+		&item.Status,
+		&item.OriginalFilename,
+		&item.Season,
+		&item.Competition,
+		&item.HomeClub,
+		&item.AwayClub,
+		&item.KickoffAt,
+		&item.ErrorMessage,
+		&item.CreatedAt,
+		&item.SubmittedAt,
+		&item.CompletedAt,
+		&item.RawResult,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ExtractionDetail{}, pgx.ErrNoRows
+		}
+
+		return ExtractionDetail{}, fmt.Errorf(
+			"get extraction by ID: %w",
+			err,
+		)
+	}
+
+	return item, nil
 }
 
 // CreatePending creates extraction records for downloaded
