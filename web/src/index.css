@@ -1,0 +1,40 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
+
+@import "tailwindcss";
+
+@theme {
+  --color-sofi-blue: #3457F5;
+  --color-sofi-orange: #FF704F;
+  --color-sofi-midnight: #111827;
+  --color-sofi-mist: #E9EDFF;
+  --color-sofi-white: #FAF9F6;
+
+  --font-heading: "Manrope", sans-serif;
+  --font-sans: "Inter", sans-serif;
+}
+
+:root {
+  font-family: var(--font-sans);
+  color: var(--color-sofi-midnight);
+  background: var(--color-sofi-white);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-heading);
+}
