@@ -11,12 +11,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const integrationDatabaseName = "sofi_dashboard_test"
+const integrationDatabaseName = "sofi_dashboard"
 
 func newIntegrationDB(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 
-	databaseURL := os.Getenv("TEST_DATABASE_URL")
+	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
 		t.Skip("TEST_DATABASE_URL not configured; skipping integration test")
 	}
