@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 
 import { CompetitionTabs } from '../components/CompetitionTabs'
+import { MatchesList } from '../components/MatchesList'
 
 interface Season {
   id: string
@@ -264,17 +265,10 @@ export function CompetitionDetailPage() {
 
       {/* Matches */}
       {activeTab === 'matches' && (
-        <div className="rounded-2xl border border-dashed border-gray-300 bg-white/60 px-6 py-16 text-center">
-          <CalendarDays size={32} className="mx-auto text-gray-300" />
-
-          <h2 className="mt-4 font-heading text-lg font-semibold text-sofi-midnight">
-            Jogos da competição
-          </h2>
-
-          <p className="mt-2 text-sm text-gray-500">
-            A listagem de partidas será integrada nesta etapa do desenvolvimento.
-          </p>
-        </div>
+        <MatchesList
+          competitionId={competition.id}
+          seasons={competition.seasons}
+        />
       )}
 
     </section>
