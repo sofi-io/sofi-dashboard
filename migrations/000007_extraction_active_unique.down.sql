@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS extractions_active_document_provider_uidx;

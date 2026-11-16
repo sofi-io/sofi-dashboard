@@ -104,8 +104,6 @@ func NewExtractionDispatcher(
 	}, nil
 }
 
-// ProcessBatch recovers abandoned submissions and dispatches
-// one batch of pending extraction tasks.
 func (d *ExtractionDispatcher) ProcessBatch(
 	ctx context.Context,
 ) (int, error) {

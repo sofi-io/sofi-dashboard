@@ -158,7 +158,7 @@ func runDiscovery(args []string) error {
 		len(result.Matches),
 		len(result.Warnings),
 	)
-
+	
 	return nil
 }
 
@@ -279,10 +279,10 @@ func runWorker() error {
 			break
 		}
 
-		// 1. Download discovered documents.
 		downloaded, err := processor.ProcessBatch(ctx)
 
 		if ctx.Err() != nil {
+			fmt.Printf("worker shutdown requested: %v\n", ctx.Err())
 			break
 		}
 
@@ -297,13 +297,13 @@ func runWorker() error {
 			)
 		}
 
-		// 2. Create extraction tasks for downloaded documents.
 		created, err := extractionRepository.CreatePending(
 			ctx,
 			extractionBatchSize,
 		)
 
 		if ctx.Err() != nil {
+			fmt.Printf("worker shutdown requested: %v\n", ctx.Err())
 			break
 		}
 
@@ -318,10 +318,11 @@ func runWorker() error {
 			)
 		}
 
-		// 3. Submit pending extractions to SOFI API.
 		dispatched, dispatchErr := dispatcher.ProcessBatch(ctx)
+		log.Printf("Extraction tasks dispatched: %d", dispatched)
 
 		if ctx.Err() != nil {
+			log.Printf("worker shutdown requested: %v\n", ctx.Err())
 			break
 		}
 
@@ -339,7 +340,6 @@ func runWorker() error {
 			)
 		}
 
-		// 4. Poll submitted extractions.
 		polled, pollErr := poller.ProcessBatch(ctx)
 
 		if ctx.Err() != nil {
@@ -360,7 +360,6 @@ func runWorker() error {
 			)
 		}
 
-		// 5. Immediately continue if either queue was full.
 		if downloaded == workerBatchSize ||
 			created == extractionBatchSize ||
 			dispatched == extractionBatchSize ||
@@ -368,7 +367,6 @@ func runWorker() error {
 			continue
 		}
 
-		// 5. Wait before polling again.
 		timer := time.NewTimer(workerPollInterval)
 
 		select {

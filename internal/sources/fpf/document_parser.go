@@ -8,7 +8,6 @@ import (
 	"golang.org/x/net/html"
 )
 
-// ParseMatchDocuments extracts the published documents from an FPF match.
 func ParseMatchDocuments(
 	baseURL string,
 	rawHTML string,

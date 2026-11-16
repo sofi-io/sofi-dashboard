@@ -79,11 +79,11 @@ func NewDocumentProcessor(
 	}, nil
 }
 
-// ProcessBatch recovers abandoned downloads and processes
-// one batch of available documents.
 func (p *DocumentProcessor) ProcessBatch(
 	ctx context.Context,
 ) (int, error) {
+
+	fmt.Println("Processing batch of documents...")
 	if err := ctx.Err(); err != nil {
 		return 0, err
 	}
@@ -128,6 +128,10 @@ func (p *DocumentProcessor) ProcessBatch(
 			continue
 		}
 
+		if doc.DocumentType != "financial_bulletin" {
+			continue
+		}
+
 		if err := p.processDocument(ctx, doc); err != nil {
 			failures = append(failures, err)
 			continue
@@ -135,6 +139,11 @@ func (p *DocumentProcessor) ProcessBatch(
 
 		processed++
 	}
+	fmt.Printf(
+		"Processed %d documents with %d failures\n",
+		processed,
+		len(failures),
+	)
 
 	return processed, errors.Join(failures...)
 }
@@ -144,7 +153,6 @@ func (p *DocumentProcessor) processDocument(
 	doc database.Document,
 ) error {
 	token := *doc.DownloadToken
-
 	result, err := p.downloader.Download(
 		ctx,
 		doc.SourceURL,
