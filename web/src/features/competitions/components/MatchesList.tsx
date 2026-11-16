@@ -10,6 +10,8 @@ import {
   AlertCircle,
 } from 'lucide-react'
 
+import { MatchDetailsModal } from './MatchDetailsModal'
+
 interface Season {
   id: string
   name: string
@@ -23,7 +25,7 @@ interface MatchDocument {
   status: string
 }
 
-interface Match {
+export interface Match {
   id: string
   season_id: string
   season: string
@@ -110,11 +112,18 @@ function hasFinancialBulletin(match: Match): boolean {
   )
 }
 
-function MatchCard({ match }: { match: Match }) {
+function MatchCard({ match, onClick, }: {
+  match: Match
+  onClick: () => void
+}) {
   const hasBulletin = hasFinancialBulletin(match)
 
   return (
-    <article className="group rounded-2xl border border-gray-200 bg-white p-5 transition-all hover:border-sofi-blue/30 hover:shadow-md sm:p-6">
+    <button
+      type="button"
+      onClick={onClick}
+      className="group w-full rounded-2xl border border-gray-200 bg-white p-5 text-left transition-all hover:border-sofi-blue/30 hover:shadow-md sm:p-6"
+      >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
           <span className="inline-flex items-center gap-1.5">
@@ -181,7 +190,7 @@ function MatchCard({ match }: { match: Match }) {
           {hasBulletin ? 'Borderô disponível' : 'Sem borderô'}
         </div>
       </div>
-    </article>
+    </button>
   )
 }
 
@@ -198,6 +207,7 @@ export function MatchesList({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
+  const [selectedMatch, setSelectedMatch] = useState<Match | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -381,12 +391,22 @@ export function MatchesList({
 
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 {roundMatches.map((match) => (
-                  <MatchCard key={match.id} match={match} />
+                  <MatchCard
+                    key={match.id}
+                    match={match}
+                    onClick={() => setSelectedMatch(match)}
+                  />
                 ))}
               </div>
             </div>
           ))}
         </div>
+      )}
+      {selectedMatch && (
+        <MatchDetailsModal
+          match={selectedMatch}
+          onClose={() => setSelectedMatch(null)}
+        />
       )}
     </section>
   )
