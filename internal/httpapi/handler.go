@@ -17,6 +17,7 @@ type Handler struct {
 	db           *pgxpool.Pool
 	extractions  *database.ExtractionRepository
 	competitions *database.CompetitionQueryRepository
+	competition  *database.CompetitionRepository
 }
 
 func NewHandler(db *pgxpool.Pool) http.Handler {
@@ -24,6 +25,7 @@ func NewHandler(db *pgxpool.Pool) http.Handler {
 		db:           db,
 		extractions:  database.NewExtractionRepository(db),
 		competitions: database.NewCompetitionQueryRepository(db),
+		competition:  database.NewCompetitionRepository(db),
 	}
 
 	mux := http.NewServeMux()
@@ -35,6 +37,7 @@ func NewHandler(db *pgxpool.Pool) http.Handler {
 	mux.HandleFunc("GET /api/extractions/{id}", h.getExtraction)
 
 	mux.HandleFunc("GET /api/competitions", h.listCompetitions)
+	mux.HandleFunc("GET /api/competitions/{id}", h.getCompetition)
 
 	return mux
 }
@@ -220,4 +223,36 @@ func (h *Handler) listCompetitions(
 		Limit:  limit,
 		Offset: offset,
 	})
+}
+
+func (h *Handler) getCompetition(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	id := strings.TrimSpace(r.PathValue("id"))
+
+	if id == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error": "competition ID is required",
+		})
+		return
+	}
+
+	item, err := h.competition.GetByID(r.Context(), id)
+
+	if errors.Is(err, database.ErrCompetitionNotFound) {
+		writeJSON(w, http.StatusNotFound, map[string]string{
+			"error": "competition not found",
+		})
+		return
+	}
+
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{
+			"error": "could not retrieve competition",
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, item)
 }
