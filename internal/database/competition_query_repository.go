@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -18,13 +19,13 @@ func NewCompetitionQueryRepository(
 }
 
 type CompetitionListItem struct {
-	ID           string   `json:"id"`
-	Name         string   `json:"name"`
-	Slug         string   `json:"slug"`
-	Organization *string  `json:"organization,omitempty"`
-	Sources      []string `json:"sources"`
-	SeasonsCount int64    `json:"seasons_count"`
-	CreatedAt    string   `json:"created_at"`
+	ID           string    `json:"id"`
+	Name         string    `json:"name"`
+	Slug         string    `json:"slug"`
+	Organization *string   `json:"organization,omitempty"`
+	Sources      []string  `json:"sources"`
+	SeasonsCount int64     `json:"seasons_count"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 func (r *CompetitionQueryRepository) List(
