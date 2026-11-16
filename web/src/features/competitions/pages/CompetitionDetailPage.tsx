@@ -9,6 +9,8 @@ import {
   Building2,
 } from 'lucide-react'
 
+import { CompetitionTabs } from '../components/CompetitionTabs'
+
 interface Season {
   id: string
   name: string
@@ -28,62 +30,59 @@ interface Competition {
   updated_at: string
 }
 
-type Tab = 'overview' | 'matches'
-
-export function CompetitionPage() {
+export function CompetitionDetailPage() {
   const { id } = useParams<{ id: string }>()
 
   const [competition, setCompetition] = useState<Competition | null>(null)
-  const [activeTab, setActiveTab] = useState<Tab>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'matches'>('overview')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  async function loadCompetition(signal?: AbortSignal) {
-    try {
-      const response = await fetch(`/api/competitions/${id}`, {
-        signal,
-      })
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error('Competição não encontrada.')
-        }
-
-        throw new Error('Não foi possível carregar a competição.')
-      }
-
-      const data: Competition = await response.json()
-
-      setCompetition(data)
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        return
-      }
-
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Ocorreu um erro inesperado.',
-      )
-    } finally {
-      if (!signal?.aborted) {
-        setLoading(false)
-      }
-    }
-  }
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     const controller = new AbortController()
 
-    void loadCompetition(controller.signal)
+    async function fetchCompetition() {
+      try {
+        const response = await fetch(
+          `/api/competitions/${id}`,
+          { signal: controller.signal },
+        )
+
+        if (!response.ok) {
+          throw new Error('Não foi possível carregar a competição.')
+        }
+
+        const data = await response.json()
+
+        if (!controller.signal.aborted) {
+          setCompetition(data)
+          setError(null)
+        }
+      } catch (err) {
+        if (controller.signal.aborted) return
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Erro inesperado ao carregar competição.',
+        )
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false)
+        }
+      }
+    }
+
+    void fetchCompetition()
 
     return () => controller.abort()
-  }, [id])
+  }, [id, reloadKey])
 
   function retryLoading() {
     setLoading(true)
     setError(null)
-    void loadCompetition()
+    setReloadKey((current) => current + 1)
   }
 
   if (loading) {
@@ -174,31 +173,10 @@ export function CompetitionPage() {
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex gap-8">
-          <button
-            onClick={() => setActiveTab('overview')}
-            className={`border-b-2 px-1 pb-4 text-sm font-semibold transition-colors ${
-              activeTab === 'overview'
-                ? 'border-sofi-blue text-sofi-blue'
-                : 'border-transparent text-gray-500 hover:text-gray-800'
-            }`}
-          >
-            Overview
-          </button>
-
-          <button
-            onClick={() => setActiveTab('matches')}
-            className={`border-b-2 px-1 pb-4 text-sm font-semibold transition-colors ${
-              activeTab === 'matches'
-                ? 'border-sofi-blue text-sofi-blue'
-                : 'border-transparent text-gray-500 hover:text-gray-800'
-            }`}
-          >
-            Jogos
-          </button>
-        </nav>
-      </div>
+      <CompetitionTabs
+        activeTab={activeTab}
+        onChange={setActiveTab}
+      />
 
       {/* Overview */}
       {activeTab === 'overview' && (

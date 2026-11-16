@@ -3,8 +3,8 @@ import { createBrowserRouter } from 'react-router-dom'
 
 import { AppLayout } from '../components/layout/AppLayout'
 import { CompetitionsPage } from '../features/competitions/pages/CompetitionsPage'
-import { CompetitionPage } from '../features/competitions/pages/CompetitionPage'
 import { IntelligencePage } from '../features/intelligence/pages/IntelligencePage'
+import { CompetitionDetailPage } from '../features/competitions/pages/CompetitionDetailPage'
 
 export const router = createBrowserRouter([
   {
@@ -16,7 +16,7 @@ export const router = createBrowserRouter([
       },
       {
         path: '/competitions/:id',
-        element: <CompetitionPage />,
+        element: <CompetitionDetailPage />,
       },
       {
         path: '/inteligencia',
