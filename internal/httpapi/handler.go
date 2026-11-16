@@ -20,6 +20,13 @@ type Handler struct {
 	competition  *database.CompetitionRepository
 }
 
+type competitionMatchListResponse struct {
+	Items  []database.CompetitionMatchItem `json:"items"`
+	Total  int64                           `json:"total"`
+	Limit  int                             `json:"limit"`
+	Offset int                             `json:"offset"`
+}
+
 func NewHandler(db *pgxpool.Pool) http.Handler {
 	h := &Handler{
 		db:           db,
@@ -38,6 +45,7 @@ func NewHandler(db *pgxpool.Pool) http.Handler {
 
 	mux.HandleFunc("GET /api/competitions", h.listCompetitions)
 	mux.HandleFunc("GET /api/competitions/{id}", h.getCompetition)
+	mux.HandleFunc("GET /api/competitions/{id}/matches", h.listCompetitionMatches)
 
 	return mux
 }
@@ -255,4 +263,75 @@ func (h *Handler) getCompetition(
 	}
 
 	writeJSON(w, http.StatusOK, item)
+}
+
+func (h *Handler) listCompetitionMatches(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	competitionID := strings.TrimSpace(r.PathValue("id"))
+
+	if competitionID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error": "competition ID is required",
+		})
+		return
+	}
+
+	query := r.URL.Query()
+
+	limit := 20
+	offset := 0
+
+	if value := query.Get("limit"); value != "" {
+		parsed, err := strconv.Atoi(value)
+		if err != nil || parsed < 1 || parsed > 100 {
+			writeJSON(w, http.StatusBadRequest, map[string]string{
+				"error": "limit must be between 1 and 100",
+			})
+			return
+		}
+		limit = parsed
+	}
+
+	if value := query.Get("offset"); value != "" {
+		parsed, err := strconv.Atoi(value)
+		if err != nil || parsed < 0 {
+			writeJSON(w, http.StatusBadRequest, map[string]string{
+				"error": "offset must be a non-negative integer",
+			})
+			return
+		}
+		offset = parsed
+	}
+
+	items, total, err := h.competition.ListMatches(
+		r.Context(),
+		competitionID,
+		strings.TrimSpace(query.Get("season")),
+		limit,
+		offset,
+	)
+
+	if errors.Is(err, database.ErrCompetitionNotFound) {
+		writeJSON(w, http.StatusNotFound, map[string]string{
+			"error": "competition not found",
+		})
+		return
+	}
+
+	if err != nil {
+		log.Printf("list competition matches failed: %v", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{
+			"error": "could not list competition matches",
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, competitionMatchListResponse{
+		Items:  items,
+		Total:  total,
+		Limit:  limit,
+		Offset: offset,
+	})
 }
