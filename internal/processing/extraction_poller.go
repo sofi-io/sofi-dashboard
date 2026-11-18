@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -116,8 +117,6 @@ func NewExtractionPoller(
 	}, nil
 }
 
-// ProcessBatch recovers abandoned polling operations and
-// processes one batch of due extractions.
 func (p *ExtractionPoller) ProcessBatch(
 	ctx context.Context,
 ) (int, error) {
