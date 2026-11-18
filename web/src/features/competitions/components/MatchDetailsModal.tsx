@@ -1,7 +1,6 @@
 
 import { useEffect } from 'react'
 import {
-  X,
   CalendarDays,
   Clock3,
   MapPin,
