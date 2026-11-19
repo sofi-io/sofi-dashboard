@@ -3,6 +3,8 @@ package fpf
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strings"
 
 	canonical "github.com/sofi-io/sofi-dashboard/internal/competition"
 )
@@ -13,6 +15,16 @@ type Adapter struct {
 
 func NewAdapter(client *Client) *Adapter {
 	return &Adapter{client: client}
+}
+
+var canonicalKeySeparator = regexp.MustCompile(`[^a-z0-9]+`)
+
+func makeCanonicalCompetitionKey(source, name string) string {
+	normalized := strings.ToLower(strings.TrimSpace(name))
+	normalized = canonicalKeySeparator.ReplaceAllString(normalized, "-")
+	normalized = strings.Trim(normalized, "-")
+
+	return strings.ToLower(source) + ":" + normalized
 }
 
 var _ canonical.Discoverer = (*Adapter)(nil)
@@ -43,9 +55,13 @@ func (a *Adapter) DiscoverCompetition(
 		Competition: canonical.Competition{
 			Source:     "fpf",
 			ExternalID: discovery.Competition.ExternalID,
-			Name:       discovery.Competition.Name,
-			Season:     discovery.Competition.Season,
-			URL:        discovery.Competition.URL,
+			CanonicalKey: makeCanonicalCompetitionKey(
+				"fpf",
+				discovery.Competition.Name,
+			),
+			Name:   discovery.Competition.Name,
+			Season: discovery.Competition.Season,
+			URL:    discovery.Competition.URL,
 		},
 		Clubs:    make([]canonical.Club, 0),
 		Phases:   make([]canonical.Phase, 0, len(discovery.Competition.Phases)),

@@ -3,11 +3,12 @@ package competition
 import "context"
 
 type Competition struct {
-	Source     string `json:"source"`
-	ExternalID string `json:"external_id"`
-	Name       string `json:"name"`
-	Season     string `json:"season,omitempty"`
-	URL        string `json:"url"`
+	Source       string `json:"source"`
+	ExternalID   string `json:"external_id"`
+	CanonicalKey string `json:"canonical_key"`
+	Name         string `json:"name"`
+	Season       string `json:"season,omitempty"`
+	URL          string `json:"url"`
 }
 
 type Club struct {

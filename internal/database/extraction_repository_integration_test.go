@@ -35,10 +35,10 @@ func setupExtractionTest(
 	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
 
 	err := db.QueryRow(ctx, `
-        INSERT INTO competitions (name, slug)
-        VALUES ($1, $2)
+        INSERT INTO competitions (name, slug, canonical_key)
+        VALUES ($1, $2, $3)
         RETURNING id
-    `, "Test Competition", "test-competition-"+suffix).
+    `, "Test Competition", "test-competition-"+suffix, "test-competition-"+suffix).
 		Scan(&competitionID)
 	if err != nil {
 		t.Fatalf("create competition: %v", err)

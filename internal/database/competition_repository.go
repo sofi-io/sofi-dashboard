@@ -74,6 +74,9 @@ func validateDiscovery(result *competition.Result) error {
 	if strings.TrimSpace(c.URL) == "" {
 		return fmt.Errorf("competition URL is required")
 	}
+	if strings.TrimSpace(c.CanonicalKey) == "" {
+		return fmt.Errorf("competition canonical key is required")
+	}
 
 	return nil
 }
@@ -88,112 +91,128 @@ func (r *CompetitionRepository) saveCompetitionAndSeason(
 	source := strings.ToLower(strings.TrimSpace(c.Source))
 	externalID := strings.TrimSpace(c.ExternalID)
 	seasonName := strings.TrimSpace(c.Season)
+	canonicalKey := strings.TrimSpace(c.CanonicalKey)
 
-	// Serialize concurrent discoveries of the same source identity.
-	lockKey := fmt.Sprintf("competition:%s:%s", source, externalID)
+	// Serialize discoveries using canonical identity.
+	lockKey := "competition:" + canonicalKey
 
 	if _, err := tx.Exec(
 		ctx,
 		`SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`,
 		lockKey,
 	); err != nil {
-		return fmt.Errorf("lock competition identity: %w", err)
+		return fmt.Errorf("lock canonical competition: %w", err)
 	}
 
-	// Resolve existing competition identity.
+	// Resolve canonical competition.
 	var competitionID string
 
 	err := tx.QueryRow(
 		ctx,
 		`
-		SELECT competition_id
-		FROM competition_sources
-		WHERE source_key = $1
-		  AND external_id = $2
-		`,
-		source,
-		externalID,
+    SELECT id
+    FROM competitions
+    WHERE canonical_key = $1
+    `,
+		canonicalKey,
 	).Scan(&competitionID)
 
 	if err != nil && err != pgx.ErrNoRows {
-		return fmt.Errorf("resolve competition identity: %w", err)
+		return fmt.Errorf("resolve canonical competition: %w", err)
 	}
 
 	if err == pgx.ErrNoRows {
-		// Create canonical competition.
 		slug := makeSlug(source, externalID)
 
 		err = tx.QueryRow(
 			ctx,
 			`
-			INSERT INTO competitions (name, slug)
-			VALUES ($1, $2)
-			RETURNING id
-			`,
+        INSERT INTO competitions (
+            name,
+            slug,
+            canonical_key
+        )
+        VALUES ($1, $2, $3)
+        RETURNING id
+        `,
 			c.Name,
 			slug,
+			canonicalKey,
 		).Scan(&competitionID)
 
 		if err != nil {
-			return fmt.Errorf("insert competition: %w", err)
-		}
-
-		// Register external identity.
-		_, err = tx.Exec(
-			ctx,
-			`
-			INSERT INTO competition_sources (
-				competition_id,
-				source_key,
-				external_id,
-				source_url
-			)
-			VALUES ($1, $2, $3, $4)
-			`,
-			competitionID,
-			source,
-			externalID,
-			c.URL,
-		)
-
-		if err != nil {
-			return fmt.Errorf("insert competition source identity: %w", err)
+			return fmt.Errorf("insert canonical competition: %w", err)
 		}
 	} else {
-		// Update metadata without changing canonical identity.
 		_, err = tx.Exec(
 			ctx,
 			`
-			UPDATE competitions
-			SET name = $1,
-			    updated_at = now()
-			WHERE id = $2
-			`,
+        UPDATE competitions
+        SET name = $1,
+            updated_at = now()
+        WHERE id = $2
+        `,
 			c.Name,
 			competitionID,
 		)
 
 		if err != nil {
-			return fmt.Errorf("update competition: %w", err)
+			return fmt.Errorf("update canonical competition: %w", err)
 		}
+	}
 
-		_, err = tx.Exec(
-			ctx,
-			`
-			UPDATE competition_sources
-			SET source_url = $1,
-			    discovered_at = now()
-			WHERE source_key = $2
-			  AND external_id = $3
-			`,
-			c.URL,
+	// Check whether this external identity already belongs
+	// to another canonical competition.
+	var existingCompetitionID string
+
+	err = tx.QueryRow(
+		ctx,
+		`
+    SELECT competition_id
+    FROM competition_sources
+    WHERE source_key = $1
+      AND external_id = $2
+    `,
+		source,
+		externalID,
+	).Scan(&existingCompetitionID)
+
+	if err != nil && err != pgx.ErrNoRows {
+		return fmt.Errorf("resolve external competition identity: %w", err)
+	}
+
+	if err == nil && existingCompetitionID != competitionID {
+		return fmt.Errorf(
+			"external competition identity %s:%s already belongs to another competition",
 			source,
 			externalID,
 		)
+	}
 
-		if err != nil {
-			return fmt.Errorf("update competition source: %w", err)
-		}
+	// Register or update external identity.
+	_, err = tx.Exec(
+		ctx,
+		`
+    INSERT INTO competition_sources (
+        competition_id,
+        source_key,
+        external_id,
+        source_url
+    )
+    VALUES ($1, $2, $3, $4)
+    ON CONFLICT (source_key, external_id)
+    DO UPDATE SET
+        source_url = EXCLUDED.source_url,
+        discovered_at = now()
+    `,
+		competitionID,
+		source,
+		externalID,
+		c.URL,
+	)
+
+	if err != nil {
+		return fmt.Errorf("save competition source identity: %w", err)
 	}
 
 	// A season identity is scoped to its source competition.

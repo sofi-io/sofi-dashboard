@@ -117,8 +117,12 @@ func ParseCompetition(rawURL, rawHTML string) (*Competition, error) {
 	}
 
 	parts := strings.Split(result.Name, "/")
+
 	if len(parts) > 1 {
 		result.Season = strings.TrimSpace(parts[len(parts)-1])
+		result.Name = strings.TrimSpace(
+			strings.Join(parts[:len(parts)-1], "/"),
+		)
 	}
 
 	return result, nil

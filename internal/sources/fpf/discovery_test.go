@@ -145,7 +145,7 @@ func TestDiscoverCompetition(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if result.Competition.Name != "Pernambucano A1 / 2026" {
+	if result.Competition.Name != "Pernambucano A1" {
 		t.Errorf("unexpected competition name: %s",
 			result.Competition.Name)
 	}

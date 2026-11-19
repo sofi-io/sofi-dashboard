@@ -33,10 +33,10 @@ func newFinancialTestFixture(t *testing.T) *financialTestFixture {
 	}
 
 	err := db.QueryRow(ctx, `
-		INSERT INTO competitions (name, slug)
-		VALUES ($1, $2)
+		INSERT INTO competitions (name, slug, canonical_key)
+		VALUES ($1, $2, $3)
 		RETURNING id
-	`, "Financial Test Competition", "financial-test-"+suffix).
+	`, "Financial Test Competition", "financial-test-"+suffix, "financial-test-"+suffix).
 		Scan(&fixture.competitionID)
 	if err != nil {
 		t.Fatalf("create competition: %v", err)
@@ -51,7 +51,7 @@ func newFinancialTestFixture(t *testing.T) *financialTestFixture {
 		t.Fatalf("create season: %v", err)
 	}
 
-	for _, name := range []string{"Alpha FC", "Beta FC", "Gamma FC"} {
+	for _, name := range []string{"Alpha FC", "Beta FC", "Gamma FC", "Delta FC"} {
 		var id string
 
 		err := db.QueryRow(ctx, `
@@ -83,6 +83,8 @@ func slugForTest(value string) string {
 		return "beta"
 	case "Gamma FC":
 		return "gamma"
+	case "Delta FC":
+		return "delta"
 	default:
 		return "unknown"
 	}
@@ -311,6 +313,7 @@ func TestGetOverview_FinancialAggregation(t *testing.T) {
 
 	match1 := fixture.createMatch(t, "Alpha FC", "Beta FC")
 	match2 := fixture.createMatch(t, "Alpha FC", "Gamma FC")
+	match3 := fixture.createMatch(t, "Alpha FC", "Delta FC")
 
 	fixture.createExtraction(
 		t, match1,
@@ -323,6 +326,8 @@ func TestGetOverview_FinancialAggregation(t *testing.T) {
 		200000, 80000, 16000, 10000, 0, 94000,
 		15000, 14000, "match-2",
 	)
+
+	_ = match3
 
 	// Third match intentionally has no completed extraction.
 

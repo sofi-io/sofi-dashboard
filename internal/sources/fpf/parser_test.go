@@ -23,7 +23,7 @@ func TestParseCompetition(t *testing.T) {
 		t.Errorf("unexpected competition ID: %s", result.ExternalID)
 	}
 
-	if result.Name != "Pernambucano A1 / 2026" {
+	if result.Name != "Pernambucano A1" {
 		t.Errorf("unexpected name: %s", result.Name)
 	}
 
