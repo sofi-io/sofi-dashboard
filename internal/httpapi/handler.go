@@ -37,15 +37,31 @@ func NewHandler(db *pgxpool.Pool) http.Handler {
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("GET /health/live", h.live)
-	mux.HandleFunc("GET /health/ready", h.ready)
-
-	mux.HandleFunc("GET /api/extractions", h.listExtractions)
-	mux.HandleFunc("GET /api/extractions/{id}", h.getExtraction)
-
-	mux.HandleFunc("GET /api/competitions", h.listCompetitions)
-	mux.HandleFunc("GET /api/competitions/{id}", h.getCompetition)
-	mux.HandleFunc("GET /api/competitions/{id}/matches", h.listCompetitionMatches)
+	mux.HandleFunc(
+		"GET /health/live",
+		h.live)
+	mux.HandleFunc(
+		"GET /health/ready",
+		h.ready)
+	mux.HandleFunc(
+		"GET /api/extractions",
+		h.listExtractions)
+	mux.HandleFunc(
+		"GET /api/extractions/{id}",
+		h.getExtraction)
+	mux.HandleFunc(
+		"GET /api/documents/{document_id}/extraction",
+		h.getExtractionByDocument,
+	)
+	mux.HandleFunc(
+		"GET /api/competitions",
+		h.listCompetitions)
+	mux.HandleFunc(
+		"GET /api/competitions/{id}",
+		h.getCompetition)
+	mux.HandleFunc(
+		"GET /api/competitions/{id}/matches",
+		h.listCompetitionMatches)
 
 	return mux
 }
@@ -158,6 +174,46 @@ func (h *Handler) getExtraction(
 	}
 
 	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{
+			"error": "could not retrieve extraction",
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, item)
+}
+
+func (h *Handler) getExtractionByDocument(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	documentID := strings.TrimSpace(r.PathValue("document_id"))
+
+	if documentID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error": "document ID is required",
+		})
+		return
+	}
+
+	item, err := h.extractions.GetLatestByDocumentID(
+		r.Context(),
+		documentID,
+	)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		writeJSON(w, http.StatusNotFound, map[string]string{
+			"error": "extraction not found for document",
+		})
+		return
+	}
+
+	if err != nil {
+		log.Printf(
+			"get extraction by document failed: %v",
+			err,
+		)
+
 		writeJSON(w, http.StatusInternalServerError, map[string]string{
 			"error": "could not retrieve extraction",
 		})
