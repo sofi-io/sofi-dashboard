@@ -54,6 +54,19 @@ interface MatchesResponse {
   offset: number
 }
 
+interface ExtractionSummary {
+  document_id: string
+  status: string
+  error_message: string | null
+}
+
+interface ExtractionsResponse {
+  items: ExtractionSummary[]
+  total: number
+  limit: number
+  offset: number
+}
+
 interface MatchesListProps {
   competitionId: string
   seasons: Season[]
@@ -102,22 +115,24 @@ function getRoundName(match: Match): string {
   return 'Rodada não informada'
 }
 
-function hasFinancialBulletin(match: Match): boolean {
-  return match.documents.some(
-    (document) =>
-      document.type === 'financial_bulletin' &&
-      ['downloaded', 'processed', 'submitted'].includes(
-        document.status,
-      ),
+function getExtractionStatus(
+  match: Match,
+  extractionStatuses: Record<string, string>,
+): string | null {
+  const bulletin = match.documents.find(
+    (document) => document.type === 'financial_bulletin',
   )
+
+  if (!bulletin) return null
+
+  return extractionStatuses[bulletin.id] ?? 'awaiting'
 }
 
-function MatchCard({ match, onClick, }: {
-  match: Match
+function MatchCard({ match, onClick, extractionStatus }: {
+  match: Match,
+  extractionStatus: string | null,
   onClick: () => void
 }) {
-  const hasBulletin = hasFinancialBulletin(match)
-
   return (
     <button
       type="button"
@@ -176,18 +191,34 @@ function MatchCard({ match, onClick, }: {
 
         <div
           className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${
-            hasBulletin
+            extractionStatus === 'completed'
               ? 'bg-green-50 text-green-700'
-              : 'bg-gray-100 text-gray-500'
+              : extractionStatus === 'failed'
+                ? 'bg-red-50 text-red-700'
+                : extractionStatus === 'processing'
+                  ? 'bg-blue-50 text-blue-700'
+                  : 'bg-gray-100 text-gray-500'
           }`}
         >
-          {hasBulletin ? (
+          {extractionStatus === 'completed' ? (
             <FileCheck2 size={14} />
-          ) : (
+          ) : extractionStatus === 'failed' ? (
             <FileX2 size={14} />
+          ) : (
+            <Clock3 size={14} />
           )}
 
-          {hasBulletin ? 'Borderô disponível' : 'Sem borderô'}
+          {!extractionStatus
+            ? 'Sem borderô'
+            : extractionStatus === 'completed'
+              ? 'Dados disponíveis'
+              : extractionStatus === 'failed'
+                ? 'Falha na extração'
+                : extractionStatus === 'processing'
+                  ? 'Em processamento'
+                  : extractionStatus === 'pending'
+                    ? 'Aguardando processamento'
+                    : 'Aguardando extração'}
         </div>
       </div>
     </button>
@@ -208,6 +239,9 @@ export function MatchesList({
   const [error, setError] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null)
+
+  const [extractionStatuses, setExtractionStatuses] =
+  useState<Record<string, string>>({})
 
   useEffect(() => {
     const controller = new AbortController()
@@ -257,6 +291,44 @@ export function MatchesList({
 
     return () => controller.abort()
   }, [competitionId, selectedSeason, reloadKey])
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    async function fetchExtractionStatuses() {
+      try {
+        const response = await fetch(
+          '/api/extractions?limit=100',
+          { signal: controller.signal },
+        )
+
+        if (!response.ok) {
+          throw new Error('Não foi possível carregar os status das extrações.')
+        }
+
+        const data: ExtractionsResponse = await response.json()
+
+        if (!controller.signal.aborted) {
+          const statuses = Object.fromEntries(
+            data.items.map((item) => [
+              item.document_id,
+              item.status,
+            ]),
+          )
+
+          setExtractionStatuses(statuses)
+        }
+      } catch (err) {
+        if (controller.signal.aborted) return
+
+        console.error('Failed to load extraction statuses:', err)
+      }
+    }
+
+    void fetchExtractionStatuses()
+
+    return () => controller.abort()
+  }, [reloadKey])
 
   const groupedMatches = matches.reduce<Record<string, Match[]>>(
     (groups, match) => {
@@ -394,6 +466,10 @@ export function MatchesList({
                   <MatchCard
                     key={match.id}
                     match={match}
+                    extractionStatus={getExtractionStatus(
+                      match,
+                      extractionStatuses,
+                    )}
                     onClick={() => setSelectedMatch(match)}
                   />
                 ))}

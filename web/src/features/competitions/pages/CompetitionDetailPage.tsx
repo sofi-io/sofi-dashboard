@@ -143,9 +143,6 @@ export function CompetitionDetailPage() {
       {/* Competition heading */}
       <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sofi-blue">
-            Observatório do Futebol
-          </p>
 
           <h1 className="font-heading text-3xl font-bold tracking-tight text-sofi-midnight sm:text-4xl">
             {competition.name}
