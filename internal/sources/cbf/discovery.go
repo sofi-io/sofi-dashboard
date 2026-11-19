@@ -253,10 +253,12 @@ func parseCompetitionName(rawHTML string) string {
 	}
 
 	if title := strings.TrimSpace(doc.Find("h1").First().Text()); title != "" {
+		title = strings.Split(title, "/")[0]
 		return title
 	}
 
 	if title := strings.TrimSpace(doc.Find("title").First().Text()); title != "" {
+		title = strings.Split(title, "/")[0]
 		return title
 	}
 

@@ -25,10 +25,17 @@ interface MatchDocument {
   status: string
 }
 
+interface MatchPhase {
+  id: string
+  name: string
+  phase_order: number
+}
+
 export interface Match {
   id: string
   season_id: string
   season: string
+  phase: MatchPhase | null
   round_name: string
   round_number: number | null
   kickoff_at: string | null
@@ -105,16 +112,6 @@ function formatTime(match: Match): string {
   return match.source_time_text || 'Horário a definir'
 }
 
-function getRoundName(match: Match): string {
-  if (match.round_name) return match.round_name
-
-  if (match.round_number !== null) {
-    return `Rodada ${match.round_number}`
-  }
-
-  return 'Rodada não informada'
-}
-
 function getExtractionStatus(
   match: Match,
   extractionStatuses: Record<string, string>,
@@ -151,10 +148,6 @@ function MatchCard({ match, onClick, extractionStatus }: {
             {formatTime(match)}
           </span>
         </div>
-
-        <span className="rounded-full bg-sofi-mist px-3 py-1 text-xs font-semibold text-sofi-blue">
-          {match.status}
-        </span>
       </div>
 
       <div className="my-6 grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-6">
@@ -330,20 +323,26 @@ export function MatchesList({
     return () => controller.abort()
   }, [reloadKey])
 
-  const groupedMatches = matches.reduce<Record<string, Match[]>>(
-    (groups, match) => {
-      const round = getRoundName(match)
+  const groupedMatches = matches.reduce<
+  Map<string, { name: string; order: number; matches: Match[] }>
+  >((groups, match) => {
+    const phaseID = match.phase?.id ?? 'unknown'
 
-      if (!groups[round]) {
-        groups[round] = []
-      }
+    if (!groups.has(phaseID)) {
+      groups.set(phaseID, {
+        name: match.phase?.name ?? 'Fase não identificada',
+        order: match.phase?.phase_order ?? Number.MAX_SAFE_INTEGER,
+        matches: [],
+      })
+    }
 
-      groups[round].push(match)
+    groups.get(phaseID)!.matches.push(match)
 
-      return groups
-    },
-    {},
-  )
+    return groups
+  }, new Map())
+
+  const orderedPhases = Array.from(groupedMatches.entries())
+    .sort(([, a], [, b]) => a.order - b.order)
 
   function retryLoading() {
     setLoading(true)
@@ -446,30 +445,27 @@ export function MatchesList({
 
       {!loading && !error && matches.length > 0 && (
         <div className="space-y-8">
-          {Object.entries(groupedMatches).map(([round, roundMatches]) => (
-            <div key={round} className="space-y-4">
+          {orderedPhases.map(([phaseID, phase]) => (
+            <div key={phaseID} className="space-y-4">
               <div className="flex items-center gap-3">
                 <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-sofi-midnight">
-                  {round}
+                  {phase.name}
                 </h3>
 
                 <div className="h-px flex-1 bg-gray-200" />
 
                 <span className="text-xs text-gray-400">
-                  {roundMatches.length}{' '}
-                  {roundMatches.length === 1 ? 'jogo' : 'jogos'}
+                  {phase.matches.length}{' '}
+                  {phase.matches.length === 1 ? 'jogo' : 'jogos'}
                 </span>
               </div>
 
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                {roundMatches.map((match) => (
+                {phase.matches.map((match) => (
                   <MatchCard
                     key={match.id}
                     match={match}
-                    extractionStatus={getExtractionStatus(
-                      match,
-                      extractionStatuses,
-                    )}
+                    extractionStatus={getExtractionStatus(match, extractionStatuses)}
                     onClick={() => setSelectedMatch(match)}
                   />
                 ))}

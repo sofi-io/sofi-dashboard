@@ -17,6 +17,7 @@ type CompetitionMatchItem struct {
 	ID          string              `json:"id"`
 	SeasonID    string              `json:"season_id"`
 	Season      string              `json:"season"`
+	Phase       *MatchPhaseItem     `json:"phase,omitempty"`
 	RoundName   string              `json:"round_name,omitempty"`
 	RoundNumber *int                `json:"round_number,omitempty"`
 	KickoffAt   *time.Time          `json:"kickoff_at,omitempty"`
@@ -27,6 +28,12 @@ type CompetitionMatchItem struct {
 	HomeClub    MatchClubItem       `json:"home_club"`
 	AwayClub    MatchClubItem       `json:"away_club"`
 	Documents   []MatchDocumentItem `json:"documents"`
+}
+
+type MatchPhaseItem struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	PhaseOrder int    `json:"phase_order"`
 }
 
 type MatchClubItem struct {
@@ -82,6 +89,9 @@ func (r *CompetitionRepository) ListMatches(
 			m.id::text,
 			s.id::text,
 			s.name,
+			p.id::text,
+			p.name,
+			p.phase_order,
 			COALESCE(m.round_name, ''),
 			m.round_number,
 			m.kickoff_at,
@@ -107,6 +117,7 @@ func (r *CompetitionRepository) ListMatches(
 		FROM competitions c
 		JOIN seasons s ON s.competition_id = c.id
 		JOIN matches m ON m.season_id = s.id
+		LEFT JOIN phases p ON p.id = m.phase_id
 		JOIN clubs home ON home.id = m.home_club_id
 		JOIN clubs away ON away.id = m.away_club_id
 		LEFT JOIN documents d ON d.match_id = m.id
@@ -115,6 +126,7 @@ func (r *CompetitionRepository) ListMatches(
 		GROUP BY
 			m.id,
 			s.id,
+			p.id,
 			home.id,
 			away.id
 		ORDER BY
@@ -135,11 +147,16 @@ func (r *CompetitionRepository) ListMatches(
 	for rows.Next() {
 		var item CompetitionMatchItem
 		var documentsJSON []byte
+		var phaseID, phaseName *string
+		var phaseOrder *int
 
 		err := rows.Scan(
 			&item.ID,
 			&item.SeasonID,
 			&item.Season,
+			&phaseID,
+			&phaseName,
+			&phaseOrder,
 			&item.RoundName,
 			&item.RoundNumber,
 			&item.KickoffAt,
@@ -156,6 +173,14 @@ func (r *CompetitionRepository) ListMatches(
 
 		if err != nil {
 			return nil, 0, fmt.Errorf("scan competition match: %w", err)
+		}
+
+		if phaseID != nil && phaseName != nil {
+			item.Phase = &MatchPhaseItem{
+				ID:         *phaseID,
+				Name:       *phaseName,
+				PhaseOrder: *phaseOrder,
+			}
 		}
 
 		if err := json.Unmarshal(documentsJSON, &item.Documents); err != nil {
