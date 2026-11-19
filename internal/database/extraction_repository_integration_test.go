@@ -1595,3 +1595,41 @@ func TestExtractionRepositoryRejectsStalePollToken(t *testing.T) {
 		t.Fatalf("current worker was rejected: %v", err)
 	}
 }
+
+func TestExtractionRepositoryGetLatestByDocumentID(t *testing.T) {
+	_, fixture := setupExtractionTest(t)
+
+	ctx := context.Background()
+
+	created, err := fixture.repository.CreatePending(ctx, 10)
+	if err != nil {
+		t.Fatalf("CreatePending(): %v", err)
+	}
+
+	if created != 1 {
+		t.Fatalf("created = %d, want 1", created)
+	}
+
+	extraction, err := fixture.repository.GetLatestByDocumentID(
+		ctx,
+		fixture.documentID,
+	)
+	if err != nil {
+		t.Fatalf("GetLatestByDocumentID(): %v", err)
+	}
+
+	if extraction.DocumentID != fixture.documentID {
+		t.Fatalf(
+			"document ID = %s, want %s",
+			extraction.DocumentID,
+			fixture.documentID,
+		)
+	}
+
+	if extraction.Status != "pending" {
+		t.Fatalf(
+			"status = %s, want pending",
+			extraction.Status,
+		)
+	}
+}

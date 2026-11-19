@@ -295,6 +295,85 @@ func (r *ExtractionRepository) GetByID(
 	return item, nil
 }
 
+func (r *ExtractionRepository) GetLatestByDocumentID(
+	ctx context.Context,
+	documentID string,
+) (ExtractionDetail, error) {
+	if r == nil || r.db == nil {
+		return ExtractionDetail{}, fmt.Errorf(
+			"extraction repository is not initialized",
+		)
+	}
+
+	if strings.TrimSpace(documentID) == "" {
+		return ExtractionDetail{}, fmt.Errorf(
+			"document ID is required",
+		)
+	}
+
+	var item ExtractionDetail
+
+	err := r.db.QueryRow(ctx, `
+        SELECT
+            e.id,
+            e.document_id,
+            e.provider,
+            e.external_extraction_id,
+            e.status,
+            d.original_filename,
+            s.name,
+            c.name,
+            home.name,
+            away.name,
+            m.kickoff_at,
+            e.error_message,
+            e.created_at,
+            e.submitted_at,
+            e.completed_at,
+            e.raw_result
+        FROM extractions e
+        JOIN documents d ON d.id = e.document_id
+        LEFT JOIN matches m ON m.id = d.match_id
+        LEFT JOIN seasons s ON s.id = m.season_id
+        LEFT JOIN competitions c ON c.id = s.competition_id
+        LEFT JOIN clubs home ON home.id = m.home_club_id
+        LEFT JOIN clubs away ON away.id = m.away_club_id
+        WHERE e.document_id = $1
+        ORDER BY e.created_at DESC, e.id DESC
+        LIMIT 1
+    `, documentID).Scan(
+		&item.ID,
+		&item.DocumentID,
+		&item.Provider,
+		&item.ExternalExtractionID,
+		&item.Status,
+		&item.OriginalFilename,
+		&item.Season,
+		&item.Competition,
+		&item.HomeClub,
+		&item.AwayClub,
+		&item.KickoffAt,
+		&item.ErrorMessage,
+		&item.CreatedAt,
+		&item.SubmittedAt,
+		&item.CompletedAt,
+		&item.RawResult,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ExtractionDetail{}, pgx.ErrNoRows
+		}
+
+		return ExtractionDetail{}, fmt.Errorf(
+			"get extraction by document ID: %w",
+			err,
+		)
+	}
+
+	return item, nil
+}
+
 // CreatePending creates extraction records for downloaded
 // documents that have never been submitted to this provider.
 func (r *ExtractionRepository) CreatePending(
