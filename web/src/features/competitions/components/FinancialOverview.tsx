@@ -1,5 +1,6 @@
 
 import { useEffect, useState } from 'react'
+import type { RefObject } from 'react'
 import {
   Wallet,
   Users,
@@ -29,6 +30,7 @@ interface Season {
 interface FinancialOverviewProps {
   competitionId: string
   seasons: Season[]
+  financialCardRef: RefObject<HTMLDivElement | null>
 }
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', {
@@ -117,51 +119,6 @@ function MatchHighlights({
           )
         })}
       </div>
-    </div>
-  )
-}
-
-function MetricCard({
-  title,
-  value,
-  description,
-  icon: Icon,
-  accent = 'blue',
-}: {
-  title: string
-  value: string
-  description?: string
-  icon: typeof Wallet
-  accent?: 'blue' | 'green' | 'orange' | 'red'
-}) {
-  const accents = {
-    blue: 'bg-sofi-mist text-sofi-blue',
-    green: 'bg-green-50 text-green-600',
-    orange: 'bg-orange-50 text-orange-600',
-    red: 'bg-red-50 text-red-600',
-  }
-
-  return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 transition-shadow hover:shadow-sm sm:p-6">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-medium text-gray-500">
-          {title}
-        </p>
-
-        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${accents[accent]}`}>
-          <Icon size={19} />
-        </div>
-      </div>
-
-      <p className="mt-5 break-words font-heading text-2xl font-bold tracking-tight text-sofi-midnight sm:text-3xl">
-        {value}
-      </p>
-
-      {description && (
-        <p className="mt-2 text-xs text-gray-400">
-          {description}
-        </p>
-      )}
     </div>
   )
 }
@@ -262,6 +219,7 @@ function FinancialSkeleton() {
 export function FinancialOverview({
   competitionId,
   seasons,
+  financialCardRef,
 }: FinancialOverviewProps) {
   const [selectedSeason, setSelectedSeason] = useState('')
   const [overview, setOverview] =
@@ -422,7 +380,7 @@ export function FinancialOverview({
 
           {/* Main metrics */}
           {/* Financial hero */}
-          <div className="overflow-hidden rounded-3xl bg-white border border-gray-200 rounded-2xl shadow-sm">
+          <div ref={financialCardRef} className="overflow-hidden rounded-3xl bg-white border border-gray-200 rounded-2xl shadow-sm">
             <div className="p-6 sm:p-8">
               <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                 {/* Gross revenue */}
