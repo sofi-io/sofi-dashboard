@@ -3,11 +3,14 @@ package database
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+var ErrSeasonNotFound = errors.New("season not found in competition")
 
 type CompetitionFinancialOverview struct {
 	TotalMatches             int `json:"total_matches"`
@@ -20,14 +23,21 @@ type CompetitionFinancialOverview struct {
 	Taxes                   float64 `json:"taxes"`
 	OtherDeductions         float64 `json:"other_deductions"`
 	MethodologicalNetResult float64 `json:"methodological_net_result"`
+	RetentionMargin         float64 `json:"retention_margin"`
 
 	TotalAttendance     int     `json:"total_attendance"`
 	PayingAttendance    int     `json:"paying_attendance"`
 	NonPayingAttendance int     `json:"non_paying_attendance"`
 	AverageAttendance   float64 `json:"average_attendance"`
 
+	DeficitMatches int `json:"deficit_matches"`
+
 	HighestRevenueMatch    *MatchFinancialHighlight `json:"highest_revenue_match"`
 	HighestAttendanceMatch *MatchFinancialHighlight `json:"highest_attendance_match"`
+	LowestAttendanceMatch  *MatchFinancialHighlight `json:"lowest_attendance_match"`
+
+	TopAttendanceClub *ClubFinancialRanking `json:"top_attendance_club"`
+	TopRetentionClub  *ClubFinancialRanking `json:"top_retention_club"`
 
 	ClubRankings []ClubFinancialRanking `json:"club_rankings"`
 }
@@ -46,6 +56,10 @@ type ClubFinancialRanking struct {
 	GrossRevenue            float64 `json:"gross_revenue"`
 	MethodologicalNetResult float64 `json:"methodological_net_result"`
 	RetentionMargin         float64 `json:"retention_margin"`
+
+	HomeMatches       int     `json:"home_matches"`
+	TotalAttendance   int     `json:"total_attendance"`
+	AverageAttendance float64 `json:"average_attendance"`
 }
 
 type financialExtractionResult struct {
@@ -91,10 +105,52 @@ func NewCompetitionFinancialRepository(
 func (r *CompetitionFinancialRepository) GetOverview(
 	ctx context.Context,
 	competitionID string,
+	seasonID string,
 ) (CompetitionFinancialOverview, error) {
 	if r == nil || r.db == nil {
 		return CompetitionFinancialOverview{},
 			fmt.Errorf("financial repository is not initialized")
+	}
+
+	var competitionExists bool
+
+	err := r.db.QueryRow(ctx, `
+    SELECT EXISTS (
+        SELECT 1
+        FROM competitions
+        WHERE id::text = $1
+    )
+`, competitionID).Scan(&competitionExists)
+
+	if err != nil {
+		return CompetitionFinancialOverview{},
+			fmt.Errorf("check competition: %w", err)
+	}
+
+	if !competitionExists {
+		return CompetitionFinancialOverview{}, ErrCompetitionNotFound
+	}
+
+	if seasonID != "" {
+		var seasonExists bool
+
+		err := r.db.QueryRow(ctx, `
+        SELECT EXISTS (
+            SELECT 1
+            FROM seasons
+            WHERE id::text = $1
+              AND competition_id::text = $2
+        )
+    `, seasonID, competitionID).Scan(&seasonExists)
+
+		if err != nil {
+			return CompetitionFinancialOverview{},
+				fmt.Errorf("check season: %w", err)
+		}
+
+		if !seasonExists {
+			return CompetitionFinancialOverview{}, ErrSeasonNotFound
+		}
 	}
 
 	const query = `
@@ -103,13 +159,15 @@ func (r *CompetitionFinancialRepository) GetOverview(
 				m.id AS match_id,
 				m.home_club_id,
 				hc.name AS home_name,
-				ac.name AS away_name
+				ac.name AS away_name,
+				s.id AS season_id
 			FROM matches m
 			JOIN seasons s ON s.id = m.season_id
 			JOIN competitions c ON c.id = s.competition_id
 			JOIN clubs hc ON hc.id = m.home_club_id
 			JOIN clubs ac ON ac.id = m.away_club_id
 			WHERE c.id = $1
+  				AND ($2 = '' OR s.id::text = $2)
 		),
 		completed_financial_extractions AS (
 			SELECT DISTINCT ON (d.match_id)
@@ -137,7 +195,7 @@ func (r *CompetitionFinancialRepository) GetOverview(
 		ORDER BY cm.match_id
 	`
 
-	rows, err := r.db.Query(ctx, query, competitionID)
+	rows, err := r.db.Query(ctx, query, competitionID, seasonID)
 	if err != nil {
 		return CompetitionFinancialOverview{},
 			fmt.Errorf("query competition financial data: %w", err)
@@ -219,6 +277,13 @@ func (r *CompetitionFinancialRepository) GetOverview(
 			overview.HighestAttendanceMatch = &copy
 		}
 
+		if overview.LowestAttendanceMatch == nil ||
+			highlight.Attendance < overview.LowestAttendanceMatch.Attendance {
+
+			copy := highlight
+			overview.LowestAttendanceMatch = &copy
+		}
+
 		club := clubTotals[row.HomeID]
 		if club == nil {
 			club = &ClubFinancialRanking{
@@ -228,8 +293,15 @@ func (r *CompetitionFinancialRepository) GetOverview(
 			clubTotals[row.HomeID] = club
 		}
 
+		club.HomeMatches++
+		club.TotalAttendance += attendance.Total
+
 		club.GrossRevenue += financial.GrossRevenue
 		club.MethodologicalNetResult += financial.MethodologicalNetResult
+		if financial.MethodologicalNetResult <= 0 {
+			overview.DeficitMatches++
+		}
+
 	}
 
 	if err := rows.Err(); err != nil {
@@ -252,6 +324,12 @@ func (r *CompetitionFinancialRepository) GetOverview(
 				club.MethodologicalNetResult / club.GrossRevenue
 		}
 
+		if club.HomeMatches > 0 {
+			club.AverageAttendance =
+				float64(club.TotalAttendance) /
+					float64(club.HomeMatches)
+		}
+
 		overview.ClubRankings = append(
 			overview.ClubRankings,
 			*club,
@@ -268,6 +346,32 @@ func (r *CompetitionFinancialRepository) GetOverview(
 
 		return a.ClubName < b.ClubName
 	})
+
+	for i := range overview.ClubRankings {
+		club := &overview.ClubRankings[i]
+
+		if overview.TopAttendanceClub == nil ||
+			club.AverageAttendance >
+				overview.TopAttendanceClub.AverageAttendance {
+
+			copy := *club
+			overview.TopAttendanceClub = &copy
+		}
+
+		if club.GrossRevenue > 0 &&
+			(overview.TopRetentionClub == nil ||
+				club.RetentionMargin >
+					overview.TopRetentionClub.RetentionMargin) {
+
+			copy := *club
+			overview.TopRetentionClub = &copy
+		}
+	}
+
+	if overview.GrossRevenue > 0 {
+		overview.RetentionMargin =
+			overview.MethodologicalNetResult / overview.GrossRevenue
+	}
 
 	return overview, nil
 }

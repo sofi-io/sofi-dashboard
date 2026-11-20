@@ -18,6 +18,7 @@ type Handler struct {
 	extractions  *database.ExtractionRepository
 	competitions *database.CompetitionQueryRepository
 	competition  *database.CompetitionRepository
+	financial    *database.CompetitionFinancialRepository
 }
 
 type competitionMatchListResponse struct {
@@ -33,6 +34,7 @@ func NewHandler(db *pgxpool.Pool) http.Handler {
 		extractions:  database.NewExtractionRepository(db),
 		competitions: database.NewCompetitionQueryRepository(db),
 		competition:  database.NewCompetitionRepository(db),
+		financial:    database.NewCompetitionFinancialRepository(db),
 	}
 
 	mux := http.NewServeMux()
@@ -51,8 +53,7 @@ func NewHandler(db *pgxpool.Pool) http.Handler {
 		h.getExtraction)
 	mux.HandleFunc(
 		"GET /api/documents/{document_id}/extraction",
-		h.getExtractionByDocument,
-	)
+		h.getExtractionByDocument)
 	mux.HandleFunc(
 		"GET /api/competitions",
 		h.listCompetitions)
@@ -62,6 +63,9 @@ func NewHandler(db *pgxpool.Pool) http.Handler {
 	mux.HandleFunc(
 		"GET /api/competitions/{id}/matches",
 		h.listCompetitionMatches)
+	mux.HandleFunc(
+		"GET /api/competitions/{id}/financial-overview",
+		h.getCompetitionFinancialOverview)
 
 	return mux
 }
@@ -221,6 +225,52 @@ func (h *Handler) getExtractionByDocument(
 	}
 
 	writeJSON(w, http.StatusOK, item)
+}
+
+func (h *Handler) getCompetitionFinancialOverview(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	competitionID := strings.TrimSpace(r.PathValue("id"))
+	seasonID := strings.TrimSpace(r.URL.Query().Get("season"))
+
+	if competitionID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error": "competition ID is required",
+		})
+		return
+	}
+
+	overview, err := h.financial.GetOverview(
+		r.Context(),
+		competitionID,
+		seasonID,
+	)
+
+	if errors.Is(err, database.ErrCompetitionNotFound) {
+		writeJSON(w, http.StatusNotFound, map[string]string{
+			"error": "competition not found",
+		})
+		return
+	}
+
+	if errors.Is(err, database.ErrSeasonNotFound) {
+		writeJSON(w, http.StatusNotFound, map[string]string{
+			"error": "season not found",
+		})
+		return
+	}
+
+	if err != nil {
+		log.Printf("get competition financial overview failed: %v", err)
+
+		writeJSON(w, http.StatusInternalServerError, map[string]string{
+			"error": "could not retrieve financial overview",
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, overview)
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
