@@ -15,10 +15,10 @@ function TeamCard({ team, onClick }: { team: any; onClick: () => void }) {
         <h3 className="font-heading text-lg font-bold text-sofi-midnight">
           {team.name}
         </h3>
-        <p className="text-sm text-gray-500">
+        {/* <p className="text-sm text-gray-500">
           Receita Bruta: R${' '}
           {formatCurrency(team.gross_revenue)}
-        </p>
+        </p> */}
       </div>
     </div>
   )
