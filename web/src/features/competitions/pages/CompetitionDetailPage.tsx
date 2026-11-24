@@ -17,6 +17,7 @@ import {
   import { CompetitionTabs } from '../components/CompetitionTabs'
   import { MatchesList } from '../components/MatchesList'
   import { FinancialOverview } from '../components/FinancialOverview'
+  import { TeamsList } from '../components/TeamsList'
 
   interface Season {
     id: string
@@ -390,7 +391,12 @@ import {
         )}
 
         {/* Teams */}
-
+        {activeTab === 'teams' && (
+          <TeamsList
+            competitionId={competition.id}
+            season={competition.seasons[0]?.id ?? ''}
+          />
+        )}
       </section>
     )
   }
