@@ -394,7 +394,7 @@ import {
         {activeTab === 'teams' && (
           <TeamsList
             competitionId={competition.id}
-            season={competition.seasons[0]?.id ?? ''}
+            seasons={competition.seasons}
           />
         )}
       </section>
