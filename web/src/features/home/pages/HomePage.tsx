@@ -29,6 +29,16 @@ function StatsCard({ stats }: { stats: GeneralStats | null }) {
   )
 }
 
+function DetailsCard({ title, value, description }: { title: string; value: string | number; description: string }) {
+  return (
+    <div className="flex flex-col gap-1 rounded-lg bg-sofi-mist p-3">
+      <span className="text-sm text-gray-600">{title}</span>
+      <span className="text-xl font-bold">{value}</span>
+      <span className="text-xs text-gray-500">{description}</span>
+    </div>
+  )
+}
+
 function fetchGeneralStats(): Promise<GeneralStats> {
     return fetch('/api/financial/general-stats')
         .then((response) => {
