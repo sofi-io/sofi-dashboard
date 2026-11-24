@@ -20,7 +20,7 @@ export function Header() {
         <nav className="flex items-center gap-1 sm:gap-2">
 
           <NavLink
-            to="/"
+            to="/competitions"
             end
             className={({ isActive }) =>
               `rounded-full px-3 py-2 text-xs font-semibold transition-colors sm:px-5 sm:text-sm ${
