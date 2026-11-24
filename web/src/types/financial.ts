@@ -18,8 +18,9 @@ export interface CompetitionStats {
     slug: string
     
     total_matches: number
-    gross_revenue: number
     total_attendance: number
+    total_teams: number
+    gross_revenue: number
     average_attendance: number
     retention_margin: number
 
