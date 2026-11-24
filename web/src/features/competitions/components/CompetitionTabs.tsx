@@ -1,5 +1,7 @@
 
-type CompetitionTab = 'overview' | 'matches'
+
+
+type CompetitionTab = 'overview' | 'teams' | 'matches'
 
 interface CompetitionTabsProps {
   activeTab: CompetitionTab
@@ -8,6 +10,7 @@ interface CompetitionTabsProps {
 
 const tabs: { id: CompetitionTab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
+  { id: 'teams', label: 'Times' },
   { id: 'matches', label: 'Jogos' },
 ]
 

@@ -2,6 +2,8 @@ export interface MatchFinancialHighlight {
   match_id: string
   home_team: string
   away_team: string
+  home_logo: string | null
+  away_logo: string | null
   gross_revenue: number
   attendance: number
 }
@@ -9,6 +11,7 @@ export interface MatchFinancialHighlight {
 export interface ClubFinancialRanking {
   club_id: string
   club_name: string
+  club_logo_url: string | null
   gross_revenue: number
   methodological_net_result: number
   retention_margin: number

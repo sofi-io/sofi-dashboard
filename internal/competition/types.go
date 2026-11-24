@@ -15,6 +15,7 @@ type Club struct {
 	ExternalID string `json:"external_id"`
 	Name       string `json:"name"`
 	URL        string `json:"url,omitempty"`
+	LogoURL    string `json:"logo_url,omitempty"`
 }
 
 type Phase struct {

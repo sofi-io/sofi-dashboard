@@ -73,6 +73,7 @@ func (a *Adapter) DiscoverCompetition(
 		result.Clubs = append(result.Clubs, canonical.Club{
 			ExternalID: club.ExternalID,
 			Name:       club.Name,
+			LogoURL:    club.LogoURL,
 		})
 	}
 

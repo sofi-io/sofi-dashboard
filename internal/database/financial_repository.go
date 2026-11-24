@@ -11,6 +11,31 @@ import (
 )
 
 var ErrSeasonNotFound = errors.New("season not found in competition")
+var ErrClubNotFound = errors.New("club not found")
+
+type TeamFinancialOverview struct {
+	TotalMatches             int `json:"total_matches"`
+	MatchesWithExtraction    int `json:"matches_with_extraction"`
+	MatchesWithoutExtraction int `json:"matches_without_extraction"`
+
+	GrossRevenue            float64 `json:"gross_revenue"`
+	OperatingExpenses       float64 `json:"operating_expenses"`
+	Fees                    float64 `json:"fees"`
+	Taxes                   float64 `json:"taxes"`
+	OtherDeductions         float64 `json:"other_deductions"`
+	MethodologicalNetResult float64 `json:"methodological_net_result"`
+	RetentionMargin         float64 `json:"retention_margin"`
+
+	TotalAttendance     int     `json:"total_attendance"`
+	PayingAttendance    int     `json:"paying_attendance"`
+	NonPayingAttendance int     `json:"non_paying_attendance"`
+	AverageAttendance   float64 `json:"average_attendance"`
+
+	DeficitMatches         int                      `json:"deficit_matches"`
+	HighestRevenueMatch    *MatchFinancialHighlight `json:"highest_revenue_match"`
+	HighestAttendanceMatch *MatchFinancialHighlight `json:"highest_attendance_match"`
+	LowestAttendanceMatch  *MatchFinancialHighlight `json:"lowest_attendance_match"`
+}
 
 type CompetitionFinancialOverview struct {
 	TotalMatches             int `json:"total_matches"`
@@ -45,7 +70,9 @@ type CompetitionFinancialOverview struct {
 type MatchFinancialHighlight struct {
 	MatchID      string  `json:"match_id"`
 	HomeTeam     string  `json:"home_team"`
+	HomeLogo     string  `json:"home_logo"`
 	AwayTeam     string  `json:"away_team"`
+	AwayLogo     string  `json:"away_logo"`
 	GrossRevenue float64 `json:"gross_revenue"`
 	Attendance   int     `json:"attendance"`
 }
@@ -53,6 +80,7 @@ type MatchFinancialHighlight struct {
 type ClubFinancialRanking struct {
 	ClubID                  string  `json:"club_id"`
 	ClubName                string  `json:"club_name"`
+	ClubeLogoURL            string  `json:"club_logo_url,omitempty"`
 	GrossRevenue            float64 `json:"gross_revenue"`
 	MethodologicalNetResult float64 `json:"methodological_net_result"`
 	RetentionMargin         float64 `json:"retention_margin"`
@@ -65,7 +93,9 @@ type ClubFinancialRanking struct {
 type financialExtractionResult struct {
 	Match struct {
 		HomeTeam string `json:"home_team"`
+		HomeLogo string `json:"home_logo"`
 		AwayTeam string `json:"away_team"`
+		AwayLogo string `json:"away_logo"`
 	} `json:"match"`
 
 	Financial struct {
@@ -85,11 +115,13 @@ type financialExtractionResult struct {
 }
 
 type financialMatchRow struct {
-	MatchID  string
-	HomeID   string
-	HomeName string
-	AwayName string
-	Result   []byte
+	MatchID     string
+	HomeID      string
+	HomeName    string
+	HomeLogoURL string
+	AwayName    string
+	AwayLogoURL string
+	Result      []byte
 }
 
 type CompetitionFinancialRepository struct {
@@ -159,7 +191,9 @@ func (r *CompetitionFinancialRepository) GetOverview(
 				m.id AS match_id,
 				m.home_club_id,
 				hc.name AS home_name,
+				COALESCE(hc.logo_url, '') AS home_logo_url,
 				ac.name AS away_name,
+				COALESCE(ac.logo_url, '') AS away_logo_url,
 				s.id AS season_id
 			FROM matches m
 			JOIN seasons s ON s.id = m.season_id
@@ -167,7 +201,7 @@ func (r *CompetitionFinancialRepository) GetOverview(
 			JOIN clubs hc ON hc.id = m.home_club_id
 			JOIN clubs ac ON ac.id = m.away_club_id
 			WHERE c.id = $1
-  				AND ($2 = '' OR s.id::text = $2)
+				AND ($2 = '' OR s.id::text = $2)
 		),
 		completed_financial_extractions AS (
 			SELECT DISTINCT ON (d.match_id)
@@ -176,8 +210,8 @@ func (r *CompetitionFinancialRepository) GetOverview(
 			FROM documents d
 			JOIN extractions e ON e.document_id = d.id
 			WHERE d.document_type = 'financial_bulletin'
-			  AND e.status = 'completed'
-			  AND d.match_id IS NOT NULL
+			AND e.status = 'completed'
+			AND d.match_id IS NOT NULL
 			ORDER BY
 				d.match_id,
 				e.updated_at DESC,
@@ -187,7 +221,9 @@ func (r *CompetitionFinancialRepository) GetOverview(
 			cm.match_id,
 			cm.home_club_id,
 			cm.home_name,
+			cm.home_logo_url,
 			cm.away_name,
+			cm.away_logo_url,
 			COALESCE(fe.raw_result::text, '')
 		FROM competition_matches cm
 		LEFT JOIN completed_financial_extractions fe
@@ -216,7 +252,9 @@ func (r *CompetitionFinancialRepository) GetOverview(
 			&row.MatchID,
 			&row.HomeID,
 			&row.HomeName,
+			&row.HomeLogoURL,
 			&row.AwayName,
+			&row.AwayLogoURL,
 			&rawResult,
 		); err != nil {
 			return CompetitionFinancialOverview{},
@@ -260,7 +298,9 @@ func (r *CompetitionFinancialRepository) GetOverview(
 		highlight := MatchFinancialHighlight{
 			MatchID:      row.MatchID,
 			HomeTeam:     row.HomeName,
+			HomeLogo:     row.HomeLogoURL,
 			AwayTeam:     row.AwayName,
+			AwayLogo:     row.AwayLogoURL,
 			GrossRevenue: financial.GrossRevenue,
 			Attendance:   attendance.Total,
 		}
@@ -287,8 +327,9 @@ func (r *CompetitionFinancialRepository) GetOverview(
 		club := clubTotals[row.HomeID]
 		if club == nil {
 			club = &ClubFinancialRanking{
-				ClubID:   row.HomeID,
-				ClubName: row.HomeName,
+				ClubID:       row.HomeID,
+				ClubName:     row.HomeName,
+				ClubeLogoURL: row.HomeLogoURL,
 			}
 			clubTotals[row.HomeID] = club
 		}
@@ -374,4 +415,74 @@ func (r *CompetitionFinancialRepository) GetOverview(
 	}
 
 	return overview, nil
+}
+
+func (r *CompetitionFinancialRepository) GetTeamOverview(
+	ctx context.Context,
+	competitionID string,
+	seasonID string,
+	clubID string,
+) (TeamFinancialOverview, error) {
+	if r == nil || r.db == nil {
+		return TeamFinancialOverview{},
+			fmt.Errorf("financial repository is not initialized")
+	}
+
+	var competitionExists bool
+
+	err := r.db.QueryRow(ctx, `
+	SELECT EXISTS (
+		SELECT 1
+		FROM competitions
+		WHERE id::text = $1
+	)
+	`, competitionID).Scan(&competitionExists)
+	if err != nil {
+		return TeamFinancialOverview{},
+			fmt.Errorf("check competition: %w", err)
+	}
+
+	if !competitionExists {
+		return TeamFinancialOverview{}, ErrCompetitionNotFound
+	}
+
+	var seasonExists bool
+
+	err = r.db.QueryRow(ctx, `
+	SELECT EXISTS (
+		SELECT 1
+		FROM seasons
+		WHERE id::text = $1
+	)
+	`, seasonID).Scan(&seasonExists)
+	if err != nil {
+		return TeamFinancialOverview{},
+			fmt.Errorf("check season: %w", err)
+	}
+
+	if !seasonExists {
+		return TeamFinancialOverview{}, ErrSeasonNotFound
+	}
+
+	var clubExists bool
+
+	err = r.db.QueryRow(ctx, `
+	SELECT EXISTS (
+		SELECT 1
+		FROM clubs
+		WHERE id::text = $1
+	)
+	`, clubID).Scan(&clubExists)
+	if err != nil {
+		return TeamFinancialOverview{},
+			fmt.Errorf("check club: %w", err)
+	}
+
+	if !clubExists {
+		return TeamFinancialOverview{}, ErrClubNotFound
+	}
+
+	
+
+	return TeamFinancialOverview{}, nil
 }

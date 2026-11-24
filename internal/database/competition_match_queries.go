@@ -37,8 +37,9 @@ type MatchPhaseItem struct {
 }
 
 type MatchClubItem struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	LogoURL string `json:"logo_url,omitempty"`
 }
 
 func (r *CompetitionRepository) ListMatches(
@@ -101,8 +102,10 @@ func (r *CompetitionRepository) ListMatches(
 			m.status,
 			home.id::text,
 			home.name,
+			COALESCE(home.logo_url, ''),
 			away.id::text,
 			away.name,
+			COALESCE(away.logo_url, ''),
 			COALESCE(
 				jsonb_agg(
 					jsonb_build_object(
@@ -166,8 +169,10 @@ func (r *CompetitionRepository) ListMatches(
 			&item.Status,
 			&item.HomeClub.ID,
 			&item.HomeClub.Name,
+			&item.HomeClub.LogoURL,
 			&item.AwayClub.ID,
 			&item.AwayClub.Name,
+			&item.AwayClub.LogoURL,
 			&documentsJSON,
 		)
 
@@ -192,6 +197,90 @@ func (r *CompetitionRepository) ListMatches(
 
 	if err := rows.Err(); err != nil {
 		return nil, 0, fmt.Errorf("iterate competition matches: %w", err)
+	}
+
+	return items, total, nil
+}
+
+func (r *CompetitionRepository) ListTeams(
+	ctx context.Context,
+	competitionID string,
+	seasonID string,
+) ([]MatchClubItem, int64, error) {
+	if r == nil || r.db == nil {
+		return nil, 0, fmt.Errorf("competition repository is not initialized")
+	}
+
+	var exists bool
+	err := r.db.QueryRow(ctx, `
+	SELECT EXISTS (
+		SELECT 1
+		FROM competitions
+		WHERE id::text = $1
+		)
+		`, competitionID).Scan(&exists)
+
+	if err != nil {
+		return nil, 0, fmt.Errorf("check competition: %w", err)
+	}
+
+	if !exists {
+		return nil, 0, ErrCompetitionNotFound
+	}
+
+	var total int64
+
+	err = r.db.QueryRow(ctx, `
+	SELECT COUNT(DISTINCT c.id)
+	FROM competitions comp
+	JOIN seasons s ON s.competition_id = comp.id
+	JOIN matches m ON m.season_id = s.id
+	JOIN clubs c ON c.id = m.home_club_id OR c.id = m.away_club_id
+	WHERE comp.id::text = $1
+	AND ($2 = '' OR s.id::text = $2)
+	`, competitionID, seasonID).Scan(&total)
+
+	if err != nil {
+		return nil, 0, fmt.Errorf("count competition teams: %w", err)
+	}
+
+	rows, err := r.db.Query(ctx, `
+	SELECT DISTINCT c.id::text, c.name, COALESCE(c.logo_url, '')
+	FROM competitions comp
+	JOIN seasons s ON s.competition_id = comp.id
+	JOIN matches m ON m.season_id = s.id
+	JOIN clubs c ON c.id = m.home_club_id OR c.id = m.away_club_id
+	WHERE comp.id::text = $1
+	AND ($2 = '' OR s.id::text = $2)
+	ORDER BY c.name
+	LIMIT $3 OFFSET $4
+	`, competitionID, seasonID, 1000, 0)
+
+	if err != nil {
+		return nil, 0, fmt.Errorf("query competition teams: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]MatchClubItem, 0)
+
+	for rows.Next() {
+		var item MatchClubItem
+
+		err := rows.Scan(
+			&item.ID,
+			&item.Name,
+			&item.LogoURL,
+		)
+
+		if err != nil {
+			return nil, 0, fmt.Errorf("scan competition team: %w", err)
+		}
+
+		items = append(items, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("iterate competition teams: %w", err)
 	}
 
 	return items, total, nil

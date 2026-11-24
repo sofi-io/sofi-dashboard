@@ -93,18 +93,37 @@ function MatchHighlights({
               {match ? (
                 <>
                   <div className="mt-4 flex items-center justify-center gap-3">
-                    <p className="min-w-0 flex-1 text-right font-heading text-base font-bold text-sofi-midnight">
-                      {match.home_team}
-                    </p>
+                    {/* Mandante */}
+                    <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+                      <img
+                        src={match.home_logo || '/images/club-placeholder.svg'}
+                        alt={match.home_team}
+                        className="h-8 w-8 shrink-0 object-contain"
+                      />
+                      <p className="min-w-0 text-right font-heading text-base font-bold text-sofi-midnight">
+                        {match.home_team}
+                      </p>
+                    </div>
 
+                    {/* VS */}
                     <span className="shrink-0 text-xs font-medium text-gray-400">
                       vs.
                     </span>
 
-                    <p className="min-w-0 flex-1 text-left font-heading text-base font-bold text-sofi-midnight">
-                      {match.away_team}
-                    </p>
-                    <div className="border-gray-100 pt-3 pb-3 bg-sofi-mist rounded-xl px-3 flex flex-col items-center justify-center">
+                    {/* Visitante */}
+                    <div className="flex min-w-0 flex-1 items-center justify-start gap-2">
+                      <p className="min-w-0 text-left font-heading text-base font-bold text-sofi-midnight">
+                        {match.away_team}
+                      </p>
+                      <img
+                        src={match.away_logo || '/images/club-placeholder.svg'}
+                        alt={match.away_team}
+                        className="h-8 w-8 shrink-0 object-contain"
+                      />
+                    </div>
+
+                    {/* Público presente */}
+                    <div className="flex shrink-0 flex-col items-center justify-center rounded-xl border-gray-100 bg-sofi-mist px-3 py-3">
                       <p className="text-xs text-gray-400">Público presente</p>
                       <p className="mt-1 font-heading text-2xl font-bold text-sofi-midnight">
                         {formatNumber(match.attendance)}
@@ -145,15 +164,25 @@ function ClubHighlights({
 
           {attendanceClub ? (
             <>
-              <p className="mt-5 font-heading text-xl font-bold text-sofi-midnight">
-                {attendanceClub.club_name}
-              </p>
+              <div className="mt-5 flex items-center gap-3">
+                <img
+                  src={attendanceClub.club_logo_url || '/images/club-placeholder.svg'}
+                  alt={attendanceClub.club_name}
+                  className="h-10 w-10 shrink-0 object-contain"
+                />
+                <p className="font-heading text-xl font-bold text-sofi-midnight">
+                  {attendanceClub.club_name}
+                </p>
+              </div>
+
               <p className="mt-2 font-heading text-3xl font-bold text-sofi-blue">
                 {formatNumber(Math.round(attendanceClub.average_attendance))}
               </p>
+
               <p className="mt-1 text-xs text-gray-400">
                 Média de público como mandante
               </p>
+
               <p className="mt-3 text-xs text-gray-500">
                 {attendanceClub.home_matches} partidas como mandante
               </p>
@@ -175,9 +204,16 @@ function ClubHighlights({
 
           {retentionClub ? (
             <>
-              <p className="mt-5 font-heading text-xl font-bold text-sofi-midnight">
-                {retentionClub.club_name}
-              </p>
+              <div className="mt-5 flex items-center gap-3">
+                <img
+                  src={retentionClub.club_logo_url || '/images/club-placeholder.svg'}
+                  alt={retentionClub.club_name}
+                  className="h-10 w-10 shrink-0 object-contain"
+                />
+                <p className="font-heading text-xl font-bold text-sofi-midnight">
+                  {retentionClub.club_name}
+                </p>
+              </div>
               <p className="mt-2 font-heading text-3xl font-bold text-green-600">
                 {formatPercentage(retentionClub.retention_margin)}
               </p>
@@ -292,15 +328,11 @@ export function FinancialOverview({
     <section className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+        {/* <div>
           <h2 className="font-heading text-xl font-bold text-sofi-midnight">
             Panorama financeiro
           </h2>
-
-          <p className="mt-1 text-sm text-gray-500">
-            Indicadores financeiros e de público da competição.
-          </p>
-        </div>
+        </div> */}
 
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative">
@@ -604,6 +636,13 @@ export function FinancialOverview({
                             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-xs font-bold text-gray-500">
                               {index + 1}
                             </span>
+
+                            <img
+                              src={club.club_logo_url || '/images/club-placeholder.svg'}
+                              alt={club.club_name}
+                              className="h-8 w-8 shrink-0 object-contain"
+                            />
+
                             <span className="font-semibold text-sofi-midnight">
                               {club.club_name}
                             </span>
@@ -619,7 +658,15 @@ export function FinancialOverview({
                         </td>
 
                         <td className="px-5 py-4 text-right">
-                          <span className="font-semibold text-green-600">
+                          <span
+                            className={`font-semibold ${
+                              club.retention_margin < 0
+                                ? 'text-red-600'
+                                : club.retention_margin > 0
+                                  ? 'text-green-600'
+                                  : 'text-gray-500'
+                            }`}
+                          >
                             {formatPercentage(club.retention_margin)}
                           </span>
                         </td>

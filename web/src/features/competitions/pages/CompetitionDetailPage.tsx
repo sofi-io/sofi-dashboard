@@ -41,7 +41,7 @@ import {
     const { id } = useParams<{ id: string }>()
 
     const [competition, setCompetition] = useState<Competition | null>(null)
-    const [activeTab, setActiveTab] = useState<'overview' | 'matches'>('overview')
+    const [activeTab, setActiveTab] = useState<'overview' | 'teams' | 'matches'>('overview')
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [reloadKey, setReloadKey] = useState(0)
@@ -310,7 +310,7 @@ import {
         {/* Overview */}
         {activeTab === 'overview' && (
           <div className="space-y-10">
-            {/* Export buttons */}
+            {/* Export buttons
             <div className="flex justify-end gap-2">
               <button
                 type="button"
@@ -329,7 +329,7 @@ import {
                 <FileText size={16} />
                 Exportar PDF
               </button>
-            </div>
+            </div> */}
 
             {/* Financial overview */}
             <div ref={overviewExportRef} className="space-y-10">
@@ -388,6 +388,8 @@ import {
             seasons={competition.seasons}
           />
         )}
+
+        {/* Teams */}
 
       </section>
     )

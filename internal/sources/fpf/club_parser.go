@@ -27,9 +27,11 @@ func ParseClubs(rawHTML string) ([]Club, error) {
 		images := findElementsByTag(row, "img")
 
 		var externalID string
+		var logoURL string
 
 		for _, img := range images {
 			src := attribute(img, "src")
+			logoURL = src
 			if src == "" {
 				continue
 			}
@@ -60,6 +62,7 @@ func ParseClubs(rawHTML string) ([]Club, error) {
 		clubs = append(clubs, Club{
 			ExternalID: externalID,
 			Name:       name,
+			LogoURL:    logoURL,
 		})
 	}
 

@@ -46,10 +46,12 @@ export interface Match {
   home_club: {
     id: string
     name: string
+    logo_url: string | null
   }
   away_club: {
     id: string
     name: string
+    logo_url: string | null
   }
   documents: MatchDocument[]
 }
@@ -151,22 +153,41 @@ function MatchCard({ match, onClick, extractionStatus }: {
       </div>
 
       <div className="my-6 grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-6">
-        <div className="min-w-0 text-left">
-          <p className="break-words font-heading text-base font-bold text-sofi-midnight sm:text-lg">
-            {match.home_club.name}
-          </p>
-          <p className="mt-1 text-xs text-gray-400">Mandante</p>
+        {/* Mandante */}
+        <div className="flex min-w-0 items-center gap-3 text-left">
+          <img
+            src={match.home_club.logo_url || '/images/club-placeholder.svg'}
+            alt={match.home_club.name}
+            className="h-10 w-10 shrink-0 object-contain sm:h-12 sm:w-12"
+          />
+
+          <div className="min-w-0">
+            <p className="break-words font-heading text-base font-bold text-sofi-midnight sm:text-lg">
+              {match.home_club.name}
+            </p>
+            <p className="mt-1 text-xs text-gray-400">Mandante</p>
+          </div>
         </div>
 
+        {/* VS */}
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100">
           <span className="text-xs font-bold text-gray-400">VS</span>
         </div>
 
-        <div className="min-w-0 text-right">
-          <p className="break-words font-heading text-base font-bold text-sofi-midnight sm:text-lg">
-            {match.away_club.name}
-          </p>
-          <p className="mt-1 text-xs text-gray-400">Visitante</p>
+        {/* Visitante */}
+        <div className="flex min-w-0 items-center justify-end gap-3 text-right">
+          <div className="min-w-0">
+            <p className="break-words font-heading text-base font-bold text-sofi-midnight sm:text-lg">
+              {match.away_club.name}
+            </p>
+            <p className="mt-1 text-xs text-gray-400">Visitante</p>
+          </div>
+
+          <img
+            src={match.away_club.logo_url || '/images/club-placeholder.svg'}
+            alt={match.away_club.name}
+            className="h-10 w-10 shrink-0 object-contain sm:h-12 sm:w-12"
+          />
         </div>
       </div>
 
@@ -353,7 +374,7 @@ export function MatchesList({
   return (
     <section className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+        {/* <div>
           <h2 className="font-heading text-xl font-bold text-sofi-midnight">
             Partidas
           </h2>
@@ -361,7 +382,7 @@ export function MatchesList({
           <p className="mt-1 text-sm text-gray-500">
             Consulte os jogos e a disponibilidade dos borderôs.
           </p>
-        </div>
+        </div> */}
 
         {seasons.length > 0 && (
           <select

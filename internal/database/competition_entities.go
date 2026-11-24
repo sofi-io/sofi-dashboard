@@ -88,6 +88,7 @@ func (r *CompetitionRepository) saveClub(
 	externalID := strings.TrimSpace(club.ExternalID)
 	name := strings.TrimSpace(club.Name)
 	sourceURL := strings.TrimSpace(club.URL)
+	logoURL := strings.TrimSpace(club.LogoURL)
 
 	lockKey := fmt.Sprintf("club:%s:%s", source, externalID)
 
@@ -127,14 +128,16 @@ func (r *CompetitionRepository) saveClub(
 			INSERT INTO clubs (
 				name,
 				canonical_name,
-				slug
+				slug,
+				logo_url
 			)
-			VALUES ($1, $2, $3)
+			VALUES ($1, $2, $3, NULLIF($4, ''))
 			RETURNING id
 			`,
 			name,
 			canonicalName,
 			slug,
+			logoURL,
 		).Scan(&clubID)
 
 		if err != nil {
@@ -172,11 +175,13 @@ func (r *CompetitionRepository) saveClub(
 		UPDATE clubs
 		SET name = $1,
 		    canonical_name = $2,
+		    logo_url = NULLIF($3, ''),
 		    updated_at = now()
-		WHERE id = $3
+		WHERE id = $4
 		`,
 		name,
 		normalizeCanonicalName(name),
+		club.LogoURL,
 		clubID,
 	)
 
