@@ -1,13 +1,14 @@
 export interface GeneralStats {
-    totalTeams: number
-    totalMatches: number
-    totalCompetitions: number
-    totalSeasons: number
+    total_teams: number
+    total_matches: number
+    total_competitions: number
+    total_seasons: number
 
-    totalRevenue: number
-    totalAttendance: number
-    totalRetention: number
-    totalDeficitMatches: number
+    total_revenue: number
+    total_gross_revenue: number
+    total_attendance: number
+    total_retention: number
+    total_deficit_matches: number
 
     competitions: CompetitionStats[]
 }

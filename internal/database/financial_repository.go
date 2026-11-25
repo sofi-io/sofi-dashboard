@@ -8,6 +8,8 @@ import (
 	"sort"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/sofi-io/sofi-dashboard/internal/competition"
 )
 
 var ErrSeasonNotFound = errors.New("season not found in competition")
@@ -482,7 +484,35 @@ func (r *CompetitionFinancialRepository) GetTeamOverview(
 		return TeamFinancialOverview{}, ErrClubNotFound
 	}
 
-	
-
 	return TeamFinancialOverview{}, nil
+}
+
+func (r *CompetitionFinancialRepository) GetGeneralStats(
+	ctx context.Context,
+) (competition.GeneralStats, error) {
+	if r == nil || r.db == nil {
+		return competition.GeneralStats{},
+			fmt.Errorf("financial repository is not initialized")
+	}
+
+	var stats competition.GeneralStats
+
+	err := r.db.QueryRow(ctx, `
+	SELECT
+		(SELECT COUNT(*) FROM clubs) AS total_teams,
+		(SELECT COUNT(*) FROM matches) AS total_matches,
+		(SELECT COUNT(*) FROM competitions) AS total_competitions,
+		(SELECT COUNT(*) FROM seasons) AS total_seasons
+	`).Scan(
+		&stats.TotalTeams,
+		&stats.TotalMatches,
+		&stats.TotalCompetitions,
+		&stats.TotalSeasons,
+	)
+	if err != nil {
+		return competition.GeneralStats{},
+			fmt.Errorf("query general stats: %w", err)
+	}
+
+	return stats, nil
 }

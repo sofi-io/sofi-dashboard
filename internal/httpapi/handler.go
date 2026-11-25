@@ -69,6 +69,9 @@ func NewHandler(db *pgxpool.Pool) http.Handler {
 	mux.HandleFunc(
 		"GET /api/competitions/{id}/teams",
 		h.listCompetitionTeams)
+	mux.HandleFunc(
+		"GET /api/financial/overview",
+		h.getFinancialOverview)
 
 	return mux
 }
@@ -303,6 +306,23 @@ func (h *Handler) getCompetitionFinancialOverview(
 // 		return
 // 	}
 // }
+
+func (h *Handler) getFinancialOverview(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	overview, err := h.financial.GetGeneralStats(r.Context())
+	if err != nil {
+		log.Printf("get financial overview failed: %v", err)
+
+		writeJSON(w, http.StatusInternalServerError, map[string]string{
+			"error": "could not retrieve financial overview",
+		})
+		return
+	}
+	
+	writeJSON(w, http.StatusOK, overview)
+}
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")

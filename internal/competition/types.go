@@ -109,3 +109,61 @@ type Discoverer interface {
 		options DiscoveryOptions,
 	) (*Result, error)
 }
+
+type GeneralStats struct {
+	TotalTeams        int `json:"total_teams"`
+	TotalMatches      int `json:"total_matches"`
+	TotalCompetitions int `json:"total_competitions"`
+	TotalSeasons      int `json:"total_seasons"`
+
+	TotalRevenue        float64 `json:"total_revenue"`
+	TotalGrossRevenue   float64 `json:"total_gross_revenue"`
+	TotalAttendance     int     `json:"total_attendance"`
+	TotalRetention      float64 `json:"total_retention"`
+	TotalDeficitMatches int     `json:"total_deficit_matches"`
+
+	Competitions []CompetitionStats `json:"competitions"`
+}
+
+type CompetitionStats struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+
+	TotalMatches      int     `json:"total_matches"`
+	TotalAttendance   int     `json:"total_attendance"`
+	TotalTeams        int     `json:"total_teams"`
+	GrossRevenue      float64 `json:"gross_revenue"`
+	AverageAttendance float64 `json:"average_attendance"`
+	RetentionMargin   float64 `json:"retention_margin"`
+
+	Matches []MatchStats `json:"matches"`
+}
+
+type MatchStats struct {
+	ID   string `json:"id"`
+	Slug string `json:"slug"`
+
+	HomeTeam string `json:"home_team"`
+	AwayTeam string `json:"away_team"`
+	HomeLogo string `json:"home_logo,omitempty"`
+	AwayLogo string `json:"away_logo,omitempty"`
+
+	GrossRevenue    float64 `json:"gross_revenue"`
+	Attendance      int     `json:"attendance"`
+	RetentionMargin float64 `json:"retention_margin"`
+}
+
+type ClubStats struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	LogoURL string `json:"logo_url,omitempty"`
+
+	TotalMatches      int     `json:"total_matches"`
+	GrossRevenue      float64 `json:"gross_revenue"`
+	TotalAttendance   int     `json:"total_attendance"`
+	AverageAttendance float64 `json:"average_attendance"`
+	RetentionMargin   float64 `json:"retention_margin"`
+
+	Matches []MatchStats `json:"matches"`
+}
