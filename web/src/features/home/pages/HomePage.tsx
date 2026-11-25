@@ -226,35 +226,45 @@ function DetailsSection({ stats }: { stats: GeneralStats | null }) {
   )
 }
 
+function CompetitionCard({ competition }: { competition: CompetitionStats }) {
+  return (
+    <div className="mx-auto max-w-7xl px-6 lg:px-12">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="flex flex-col gap-1 rounded-lg bg-sofi-mist p-3">
+          <span className="text-sm text-gray-600">{competition.name}</span>
+          <span className="text-xs text-gray-500">{competition.total_teams} clubes</span>
+          <span className="text-xl font-bold">{competition.total_matches} partidas</span>
+          <span className="text-xs text-gray-500">R$ {competition.gross_revenue.toLocaleString()}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
 
+function CompetitionsSection({ competitions }: { competitions: CompetitionStats[] }) {
+  if (!competitions || competitions.length === 0) {
+    return null
+  }
+
+  return (
+    <section className="w-full bg-sofi-white pb-12">
+      <div className="mx-auto max-w-7xl px-6 lg:px-12">
+        <h2 className="text-lg font-bold">Um país, muitos campeonatos</h2>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {competitions.slice(0, 3).map((competition) => (
+            <CompetitionCard competition={competition} />
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
 
 function formatNumber(value: number): string {
   return value.toLocaleString('pt-BR', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   })
-}
-
-function CompetitionStatsCard({ competitions }: { competitions: CompetitionStats[] }) {
-  return (
-    <section className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2 rounded-lg border border-gray-200/70 bg-white/90 p-4 shadow-[0_4px_24px_rgba(17,24,39,0.05)] backdrop-blur-xl">
-        <h2 className="text-lg font-semibold">Os estaduais, em números</h2>
-      </div>
-    
-      {/*Cards*/}
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {competitions.slice(0, 3).map((competition) => (
-          <div key={competition.id} className="flex flex-col gap-1 rounded-lg bg-sofi-mist p-3">
-            <span className="text-sm text-gray-600">{competition.name}</span>
-            <span className="text-xs text-gray-500">{competition.total_teams} clubes</span>
-            <span className="text-xl font-bold">{competition.total_matches} partidas</span>
-            <span className="text-xs text-gray-500">R$ {competition.gross_revenue.toLocaleString()}</span>
-          </div>
-        ))}
-      </div>
-    </section>
-  ) 
 }
 
 async function fetchGeneralStats(): Promise<GeneralStats> {
@@ -300,6 +310,8 @@ export function HomePage() {
       <StatsSection stats={stats} />
 
       <DetailsSection stats={stats} />
+
+      <CompetitionsSection competitions={stats?.competitions || []} />
     </main>
   )
 }
