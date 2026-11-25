@@ -311,7 +311,9 @@ func (h *Handler) getFinancialOverview(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
-	overview, err := h.financial.GetGeneralStats(r.Context())
+	seasonName := strings.TrimSpace(r.URL.Query().Get("season"))
+
+	overview, err := h.financial.GetGeneralStats(r.Context(), seasonName)
 	if err != nil {
 		log.Printf("get financial overview failed: %v", err)
 
@@ -320,7 +322,7 @@ func (h *Handler) getFinancialOverview(
 		})
 		return
 	}
-	
+
 	writeJSON(w, http.StatusOK, overview)
 }
 

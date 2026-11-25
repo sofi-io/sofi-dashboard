@@ -489,6 +489,7 @@ func (r *CompetitionFinancialRepository) GetTeamOverview(
 
 func (r *CompetitionFinancialRepository) GetGeneralStats(
 	ctx context.Context,
+	seasonName string,
 ) (competition.GeneralStats, error) {
 	if r == nil || r.db == nil {
 		return competition.GeneralStats{},
@@ -499,12 +500,56 @@ func (r *CompetitionFinancialRepository) GetGeneralStats(
 	var competitionsJSON []byte
 
 	const query = `
-        WITH completed_financial_extractions AS (
+        WITH filtered_seasons AS (
+            SELECT
+                id,
+                name,
+                competition_id
+            FROM seasons
+            WHERE ($1 = '' OR name = $1)
+        ),
+
+        filtered_matches AS (
+            SELECT
+                m.id,
+                m.season_id,
+                m.home_club_id,
+                m.away_club_id,
+                s.competition_id
+            FROM matches m
+            JOIN filtered_seasons s
+                ON s.id = m.season_id
+        ),
+
+        filtered_clubs AS (
+            SELECT home_club_id AS club_id
+            FROM filtered_matches
+
+            UNION
+
+            SELECT away_club_id AS club_id
+            FROM filtered_matches
+        ),
+
+        filtered_competitions AS (
+            SELECT DISTINCT
+                c.id,
+                c.name,
+                c.slug
+            FROM competitions c
+            JOIN filtered_seasons s
+                ON s.competition_id = c.id
+        ),
+
+        completed_financial_extractions AS (
             SELECT DISTINCT ON (d.match_id)
                 d.match_id,
                 e.raw_result
             FROM documents d
-            JOIN extractions e ON e.document_id = d.id
+            JOIN extractions e
+                ON e.document_id = d.id
+            JOIN filtered_matches m
+                ON m.id = d.match_id
             WHERE d.document_type = 'financial_bulletin'
               AND e.status = 'completed'
               AND d.match_id IS NOT NULL
@@ -553,8 +598,8 @@ func (r *CompetitionFinancialRepository) GetGeneralStats(
 
         competition_matches AS (
             SELECT
-                c.id AS competition_id,
-                s.id AS season_id,
+                m.competition_id,
+                m.season_id,
                 m.id AS match_id,
                 m.home_club_id,
                 m.away_club_id,
@@ -563,11 +608,7 @@ func (r *CompetitionFinancialRepository) GetGeneralStats(
                 fd.net_revenue,
                 fd.attendance
 
-            FROM competitions c
-            JOIN seasons s
-                ON s.competition_id = c.id
-            JOIN matches m
-                ON m.season_id = s.id
+            FROM filtered_matches m
             LEFT JOIN financial_data fd
                 ON fd.match_id = m.id
         ),
@@ -598,9 +639,9 @@ func (r *CompetitionFinancialRepository) GetGeneralStats(
             SELECT
                 competition_id,
                 jsonb_agg(
-                    name ORDER BY name
+                    DISTINCT name ORDER BY name
                 ) AS seasons
-            FROM seasons
+            FROM filtered_seasons
             GROUP BY competition_id
         ),
 
@@ -636,7 +677,7 @@ func (r *CompetitionFinancialRepository) GetGeneralStats(
                 COALESCE(cs.seasons, '[]'::jsonb)
                     AS seasons
 
-            FROM competitions c
+            FROM filtered_competitions c
 
             LEFT JOIN competition_matches cm
                 ON cm.competition_id = c.id
@@ -656,10 +697,25 @@ func (r *CompetitionFinancialRepository) GetGeneralStats(
         )
 
         SELECT
-            (SELECT COUNT(*) FROM clubs),
-            (SELECT COUNT(*) FROM matches),
-            (SELECT COUNT(*) FROM competitions),
-            (SELECT COUNT(*) FROM seasons),
+            (
+                SELECT COUNT(DISTINCT club_id)
+                FROM filtered_clubs
+            ) AS total_teams,
+
+            (
+                SELECT COUNT(*)
+                FROM filtered_matches
+            ) AS total_matches,
+
+            (
+                SELECT COUNT(*)
+                FROM filtered_competitions
+            ) AS total_competitions,
+
+            (
+                SELECT COUNT(*)
+                FROM filtered_seasons
+            ) AS total_seasons,
 
             fs.total_revenue,
             fs.total_gross_revenue,
@@ -700,7 +756,7 @@ func (r *CompetitionFinancialRepository) GetGeneralStats(
         FROM financial_summary fs
     `
 
-	err := r.db.QueryRow(ctx, query).Scan(
+	err := r.db.QueryRow(ctx, query, seasonName).Scan(
 		&stats.TotalTeams,
 		&stats.TotalMatches,
 		&stats.TotalCompetitions,
