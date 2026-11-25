@@ -110,14 +110,129 @@ function StatsCard({ stats }: { stats: GeneralStats | null }) {
   )
 }
 
-function DetailsCard({ title, value, description }: { title: string; value: string | number; description: string }) {
+function StatsSection({ stats }: { stats: GeneralStats | null }) {
+  if (!stats) {
+    return null
+  }
+
   return (
-    <div className="flex flex-col gap-1 rounded-lg bg-sofi-mist p-3">
-      <span className="text-sm text-gray-600">{title}</span>
-      <span className="text-xl font-bold">{value}</span>
-      <span className="text-xs text-gray-500">{description}</span>
+    <section className="w-full bg-sofi-white py-12 lg:py-20">
+      <div className="mx-auto max-w-7xl px-6 lg:px-12">
+        <div className="grid items-start gap-12 lg:grid-cols-[1.6fr_1fr] lg:gap-16">
+          <div className="flex flex-col items-start">
+            <span className="text-xs font-bold uppercase tracking-[0.2em] text-sofi-blue">
+              Dados abertos. Futebol às claras.
+            </span>
+            <h1 className="mt-6 max-w-3xl font-heading text-4xl font-extrabold leading-[1.1] tracking-tight text-sofi-midnight sm:text-5xl lg:text-6xl">
+              O jogo também
+              <br className="hidden lg:block" />
+              acontece nas contas.
+            </h1>
+            <p className="mt-6 max-w-xl text-base leading-relaxed text-gray-500 lg:text-lg">
+              Entenda o dinheiro que movimenta os estaduais.
+              <br className="hidden sm:block" />
+              Receitas, custos e público, do campeonato ao seu clube.
+            </p>
+            <div className="mt-7 flex flex-wrap items-center gap-3">
+              <a
+                href="/competitions"
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-sofi-blue px-5 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-sofi-blue/90"
+              >
+                Explorar competições
+                <span aria-hidden="true">↗</span>
+              </a>
+              <a
+                href="#methodology"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-5 py-3.5 text-sm font-semibold text-sofi-midnight transition-colors hover:bg-sofi-mist"
+              >
+                Como ler os dados
+                <span aria-hidden="true">↓</span>
+              </a>
+            </div>
+
+            <div className="mt-7 flex flex-wrap items-center gap-x-7 gap-y-3 text-xs">
+              <span className="font-semibold text-sofi-midnight">
+                {stats?.total_competitions || 0} competições
+              </span>
+              <span className="font-semibold text-sofi-midnight">
+                {stats?.total_seasons || 0} temporadas
+              </span>
+            </div>
+          </div>
+
+          <div className="w-full rounded-2xl bg-sofi-midnight p-7 sm:p-8 lg:p-9">
+            <StatsCard stats={stats} />
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function DetailsCard({ title, value, description }: { title: string, value: string | number, description: string }) {
+  return (
+    <div className="flex h-full flex-col rounded-2xl border border-gray-200 bg-white p-5 lg:p-6">
+      <span className="text-sm font-medium text-gray-500">
+        {title}
+      </span>
+
+      <span className="mt-3 font-heading text-3xl font-extrabold tracking-tight text-sofi-midnight lg:text-4xl">
+        {value}
+      </span>
+
+      <span className="mt-2 text-xs leading-relaxed text-gray-500">
+        {description}
+      </span>
     </div>
   )
+}
+
+function DetailsSection({ stats }: { stats: GeneralStats | null }) {
+  if (!stats) {
+    return null
+  }
+
+  return (
+    <section className="w-full bg-sofi-white pb-12">
+      <div className="mx-auto max-w-7xl px-6 lg:px-12">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+
+          <DetailsCard
+            title="Receita bruta"
+            value={formatNumber(stats.total_gross_revenue)}
+            description="Bilheteria antes das deduções"
+          />
+
+          <DetailsCard
+            title="Resultado líquido"
+            value={formatNumber(stats.total_revenue)}
+            description="Receita após custos, taxas e impostos"
+          />
+
+          <DetailsCard
+            title="Público total"
+            value={formatNumber(stats.total_attendance)}
+            description="Público pagante nos estádios"
+          />
+
+          <DetailsCard
+            title="Jogos deficitários"
+            value={formatNumber(stats.total_deficit_matches)}
+            description="Partidas com receita negativa"
+          />
+        </div>
+      </div>
+    </section>
+  )
+}
+
+
+
+function formatNumber(value: number): string {
+  return value.toLocaleString('pt-BR', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  })
 }
 
 function CompetitionStatsCard({ competitions }: { competitions: CompetitionStats[] }) {
@@ -181,70 +296,10 @@ export function HomePage() {
   }
 
   return (
-    <section className="w-full bg-sofi-white py-12 lg:py-20">
-      <div className="mx-auto max-w-7xl px-6 lg:px-12">
-        <div className="grid items-start gap-12 lg:grid-cols-[1.6fr_1fr] lg:gap-16">
+    <main className="bg-sofi-white">
+      <StatsSection stats={stats} />
 
-          {/* Apresentação institucional */}
-          <div className="flex flex-col items-start">
-
-            <span className="text-xs font-bold uppercase tracking-[0.2em] text-sofi-blue">
-              Dados abertos. Futebol às claras.
-            </span>
-
-            <h1 className="mt-6 max-w-3xl font-heading text-4xl font-extrabold leading-[1.1] tracking-tight text-sofi-midnight sm:text-5xl lg:text-6xl">
-              O jogo também
-              <br className="hidden lg:block" />
-              acontece nas contas.
-            </h1>
-
-            <p className="mt-6 max-w-xl text-base leading-relaxed text-gray-500 lg:text-lg">
-              Entenda o dinheiro que movimenta os estaduais.
-              <br className="hidden sm:block" />
-              Receitas, custos e público, do campeonato ao seu clube.
-            </p>
-
-            {/* Botões */}
-            <div className="mt-7 flex flex-wrap items-center gap-3">
-
-              <a
-                href="/competitions"
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-sofi-blue px-5 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-sofi-blue/90"
-              >
-                Explorar competições
-                <span aria-hidden="true">↗</span>
-              </a>
-
-              <a
-                href="#methodology"
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-5 py-3.5 text-sm font-semibold text-sofi-midnight transition-colors hover:bg-sofi-mist"
-              >
-                Como ler os dados
-                <span aria-hidden="true">↓</span>
-              </a>
-
-            </div>
-
-            {/* Estatísticas gerais */}
-            <div className="mt-7 flex flex-wrap items-center gap-x-7 gap-y-3 text-xs">
-
-              <span className="font-semibold text-sofi-midnight">
-                {stats?.total_competitions || 0} competições
-              </span>
-
-              <span className="font-semibold text-sofi-midnight">
-                {stats?.total_seasons || 0} temporadas
-              </span>
-            </div>
-          </div>
-
-          {/* Card financeiro */}
-          <div className="w-full rounded-2xl bg-sofi-midnight p-7 sm:p-8 lg:p-9">
-            <StatsCard stats={stats} />
-          </div>
-
-        </div>
-      </div>
-    </section>
+      <DetailsSection stats={stats} />
+    </main>
   )
 }
