@@ -123,7 +123,7 @@ function StatsSection({ stats }: { stats: GeneralStats | null }) {
   }
 
   return (
-    <section className="w-full bg-sofi-white py-12 lg:py-20">
+    <section className="w-full bg-sofi-white py-12 lg:py-10">
       <div className="mx-auto max-w-7xl px-6 lg:px-12">
         <div className="grid items-start gap-12 lg:grid-cols-[1.6fr_1fr] lg:gap-16">
           <div className="flex flex-col items-start">
