@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { toPng, toCanvas } from 'html-to-image'
-import { jsPDF } from 'jspdf'
-import {
-  FileImage,
-  FileText,
-} from 'lucide-react'
+// import { toPng, toCanvas } from 'html-to-image'
+// import { jsPDF } from 'jspdf'
+// import {
+//   FileImage,
+//   FileText,
+// } from 'lucide-react'
   import { Link, useParams } from 'react-router-dom'
   import {
     ArrowLeft,
@@ -50,127 +50,127 @@ import {
     const overviewExportRef = useRef<HTMLDivElement>(null)
     const financialCardRef = useRef<HTMLDivElement>(null)
 
-    function getExportFilename(extension: string) {
-      const slug = competition?.slug ?? 'competicao'
+    // function getExportFilename(extension: string) {
+    //   const slug = competition?.slug ?? 'competicao'
 
-      return `sofi-${slug}-overview.${extension}`
-    }
+    //   return `sofi-${slug}-overview.${extension}`
+    // }
 
-    async function exportFinancialCard() {
-      try {
-        const element = financialCardRef.current
+    // async function exportFinancialCard() {
+    //   try {
+    //     const element = financialCardRef.current
 
-        if (!element) {
-          throw new Error('Card financeiro não encontrado.')
-        }
+    //     if (!element) {
+    //       throw new Error('Card financeiro não encontrado.')
+    //     }
 
-        const dataUrl = await toPng(element, {
-          pixelRatio: 2,
-          backgroundColor: '#ffffff',
-          cacheBust: true,
-        })
+    //     const dataUrl = await toPng(element, {
+    //       pixelRatio: 2,
+    //       backgroundColor: '#ffffff',
+    //       cacheBust: true,
+    //     })
 
-        const link = document.createElement('a')
-        link.download = getExportFilename('png')
-        link.href = dataUrl
+    //     const link = document.createElement('a')
+    //     link.download = getExportFilename('png')
+    //     link.href = dataUrl
 
-        document.body.appendChild(link)
-        link.click()
-        link.remove()
+    //     document.body.appendChild(link)
+    //     link.click()
+    //     link.remove()
 
-      } catch (error) {
-        console.error('Erro ao exportar imagem:', error)
-        alert(
-          error instanceof Error
-            ? error.message
-            : 'Erro ao exportar imagem.'
-        )
-      }
-    }
+    //   } catch (error) {
+    //     console.error('Erro ao exportar imagem:', error)
+    //     alert(
+    //       error instanceof Error
+    //         ? error.message
+    //         : 'Erro ao exportar imagem.'
+    //     )
+    //   }
+    // }
 
-    async function exportOverviewPDF() {
-      try {
-        const element = overviewExportRef.current
+    // async function exportOverviewPDF() {
+    //   try {
+    //     const element = overviewExportRef.current
 
-        if (!element) {
-          throw new Error('Área do relatório não encontrada.')
-        }
+    //     if (!element) {
+    //       throw new Error('Área do relatório não encontrada.')
+    //     }
 
-        const canvas = await toCanvas(element, {
-          pixelRatio: 2,
-          backgroundColor: '#FAF9F6',
-          cacheBust: true,
-        })
+    //     const canvas = await toCanvas(element, {
+    //       pixelRatio: 2,
+    //       backgroundColor: '#FAF9F6',
+    //       cacheBust: true,
+    //     })
 
-        const pdf = new jsPDF('p', 'mm', 'a4')
+    //     const pdf = new jsPDF('p', 'mm', 'a4')
 
-        const pageWidth = 190
-        const pageHeight = 277
+    //     const pageWidth = 190
+    //     const pageHeight = 277
 
-        const sourcePageHeight =
-          canvas.width * (pageHeight / pageWidth)
+    //     const sourcePageHeight =
+    //       canvas.width * (pageHeight / pageWidth)
 
-        let sourceY = 0
-        let pageNumber = 0
+    //     let sourceY = 0
+    //     let pageNumber = 0
 
-        while (sourceY < canvas.height) {
-          const sliceHeight = Math.min(
-            sourcePageHeight,
-            canvas.height - sourceY,
-          )
+    //     while (sourceY < canvas.height) {
+    //       const sliceHeight = Math.min(
+    //         sourcePageHeight,
+    //         canvas.height - sourceY,
+    //       )
 
-          const pageCanvas = document.createElement('canvas')
-          pageCanvas.width = canvas.width
-          pageCanvas.height = sliceHeight
+    //       const pageCanvas = document.createElement('canvas')
+    //       pageCanvas.width = canvas.width
+    //       pageCanvas.height = sliceHeight
 
-          const context = pageCanvas.getContext('2d')
+    //       const context = pageCanvas.getContext('2d')
 
-          if (!context) {
-            throw new Error('Não foi possível criar a imagem do PDF.')
-          }
+    //       if (!context) {
+    //         throw new Error('Não foi possível criar a imagem do PDF.')
+    //       }
 
-          context.drawImage(
-            canvas,
-            0,
-            sourceY,
-            canvas.width,
-            sliceHeight,
-            0,
-            0,
-            canvas.width,
-            sliceHeight,
-          )
+    //       context.drawImage(
+    //         canvas,
+    //         0,
+    //         sourceY,
+    //         canvas.width,
+    //         sliceHeight,
+    //         0,
+    //         0,
+    //         canvas.width,
+    //         sliceHeight,
+    //       )
 
-          if (pageNumber > 0) {
-            pdf.addPage()
-          }
+    //       if (pageNumber > 0) {
+    //         pdf.addPage()
+    //       }
 
-          const imageData = pageCanvas.toDataURL('image/png')
+    //       const imageData = pageCanvas.toDataURL('image/png')
 
-          pdf.addImage(
-            imageData,
-            'PNG',
-            10,
-            10,
-            pageWidth,
-            (sliceHeight / canvas.width) * pageWidth,
-          )
+    //       pdf.addImage(
+    //         imageData,
+    //         'PNG',
+    //         10,
+    //         10,
+    //         pageWidth,
+    //         (sliceHeight / canvas.width) * pageWidth,
+    //       )
 
-          sourceY += sliceHeight
-          pageNumber++
-        }
+    //       sourceY += sliceHeight
+    //       pageNumber++
+    //     }
 
-        pdf.save(getExportFilename('pdf'))
+    //     pdf.save(getExportFilename('pdf'))
 
-      } catch (error) {
-        console.error('Erro ao exportar PDF:', error)
-        alert(
-          error instanceof Error
-            ? error.message
-            : 'Erro ao exportar PDF.'
-        )
-      }
-    }
+    //   } catch (error) {
+    //     console.error('Erro ao exportar PDF:', error)
+    //     alert(
+    //       error instanceof Error
+    //         ? error.message
+    //         : 'Erro ao exportar PDF.'
+    //     )
+    //   }
+    // }
 
     useEffect(() => {
       const controller = new AbortController()

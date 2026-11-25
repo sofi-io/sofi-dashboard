@@ -17,10 +17,14 @@ export interface CompetitionStats {
     id: string
     name: string
     slug: string
+    seasons: string[]
     
     total_matches: number
     total_attendance: number
     total_teams: number
+    total_revenue: number
+    total_deficit_matches: number
+
     gross_revenue: number
     average_attendance: number
     retention_margin: number

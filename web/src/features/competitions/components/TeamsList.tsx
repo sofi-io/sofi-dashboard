@@ -110,16 +110,16 @@ export function TeamsList({ competitionId, seasons }: { competitionId: string; s
   )
 }
 
-function formatCurrency(value: number | undefined): string {
-  if (value === undefined || !Number.isFinite(value)) {
-    return '—'
-  }
+// function formatCurrency(value: number | undefined): string {
+//   if (value === undefined || !Number.isFinite(value)) {
+//     return '—'
+//   }
 
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  }).format(value)
-}
+//   return new Intl.NumberFormat('pt-BR', {
+//     style: 'currency',
+//     currency: 'BRL',
+//   }).format(value)
+// }
 
 export default TeamsList
 

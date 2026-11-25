@@ -130,15 +130,17 @@ type CompetitionStats struct {
 	Name string `json:"name"`
 	Slug string `json:"slug"`
 
-	TotalMatches      int      `json:"total_matches"`
-	TotalAttendance   int      `json:"total_attendance"`
-	TotalTeams        int      `json:"total_teams"`
-	TotalRevenue      float64  `json:"total_revenue"`
-	GrossRevenue      float64  `json:"gross_revenue"`
-	AverageAttendance float64  `json:"average_attendance"`
-	RetentionMargin   float64  `json:"retention_margin"`
-	Seasons           []string `json:"seasons"`
+	TotalMatches        int     `json:"total_matches"`
+	TotalAttendance     int     `json:"total_attendance"`
+	TotalTeams          int     `json:"total_teams"`
+	TotalRevenue        float64 `json:"total_revenue"`
+	TotalDeficitMatches int     `json:"total_deficit_matches"`
 
+	GrossRevenue      float64 `json:"gross_revenue"`
+	AverageAttendance float64 `json:"average_attendance"`
+	RetentionMargin   float64 `json:"retention_margin"`
+
+	Seasons []string     `json:"seasons"`
 	Matches []MatchStats `json:"matches"`
 }
 
