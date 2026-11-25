@@ -206,13 +206,13 @@ function DetailsSection({ stats }: { stats: GeneralStats | null }) {
 
           <DetailsCard
             title="Receita bruta"
-            value={formatNumber(stats.total_gross_revenue)}
+            value={formatMillions(stats.total_gross_revenue)}
             description="Bilheteria antes das deduções"
           />
 
           <DetailsCard
             title="Resultado líquido"
-            value={formatNumber(stats.total_revenue)}
+            value={formatMillions(stats.total_revenue)}
             description="Receita após custos, taxas e impostos"
           />
 
@@ -233,15 +233,33 @@ function DetailsSection({ stats }: { stats: GeneralStats | null }) {
   )
 }
 
+const formatMillions = (value: number) =>
+    value / 1_000_000 < 1
+      ? `R$ ${(value / 1_000).toLocaleString('pt-BR', {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 0,
+        })} mil`
+      :
+      `R$ ${(value / 1_000_000).toLocaleString('pt-BR', {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1,
+    })} mi`
+
 function CompetitionCard({
   competition,
 }: {
   competition: CompetitionStats
 }) {
   const formatMillions = (value: number) =>
-    `R$ ${(value / 1_000_000).toLocaleString('pt-BR', {
-      minimumFractionDigits: 1,
-      maximumFractionDigits: 1,
+    value / 1_000_000 < 1
+      ? `R$ ${(value / 1_000).toLocaleString('pt-BR', {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 0,
+        })} mil`
+      :
+      `R$ ${(value / 1_000_000).toLocaleString('pt-BR', {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1,
     })} mi`
 
   return (
