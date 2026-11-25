@@ -494,7 +494,7 @@ export function HomePage() {
     <main className="bg-sofi-white">
       <div className="flex w-full justify-end">
         <SeasonSelector
-          seasons={['2026', '2025']}
+          seasons={['2026', '2025', '2024', '2023', '2022']}
           selectedSeason={selectedSeason}
           onChange={setSelectedSeason}
         />
