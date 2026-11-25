@@ -496,22 +496,234 @@ func (r *CompetitionFinancialRepository) GetGeneralStats(
 	}
 
 	var stats competition.GeneralStats
+	var competitionsJSON []byte
 
-	err := r.db.QueryRow(ctx, `
-	SELECT
-		(SELECT COUNT(*) FROM clubs) AS total_teams,
-		(SELECT COUNT(*) FROM matches) AS total_matches,
-		(SELECT COUNT(*) FROM competitions) AS total_competitions,
-		(SELECT COUNT(*) FROM seasons) AS total_seasons
-	`).Scan(
+	const query = `
+        WITH completed_financial_extractions AS (
+            SELECT DISTINCT ON (d.match_id)
+                d.match_id,
+                e.raw_result
+            FROM documents d
+            JOIN extractions e ON e.document_id = d.id
+            WHERE d.document_type = 'financial_bulletin'
+              AND e.status = 'completed'
+              AND d.match_id IS NOT NULL
+            ORDER BY
+                d.match_id,
+                e.updated_at DESC,
+                e.id DESC
+        ),
+
+        financial_data AS (
+            SELECT
+                match_id,
+
+                (raw_result #>>
+                    '{result,financial,gross_revenue}'
+                )::numeric AS gross_revenue,
+
+                (raw_result #>>
+                    '{result,financial,methodological_net_result}'
+                )::numeric AS net_revenue,
+
+                (raw_result #>>
+                    '{result,attendance,total}'
+                )::bigint AS attendance
+
+            FROM completed_financial_extractions
+        ),
+
+        financial_summary AS (
+            SELECT
+                COALESCE(SUM(gross_revenue), 0)
+                    AS total_gross_revenue,
+
+                COALESCE(SUM(net_revenue), 0)
+                    AS total_revenue,
+
+                COALESCE(SUM(attendance), 0)
+                    AS total_attendance,
+
+                COUNT(*) FILTER (
+                    WHERE net_revenue < 0
+                ) AS total_deficit_matches
+
+            FROM financial_data
+        ),
+
+        competition_matches AS (
+            SELECT
+                c.id AS competition_id,
+                s.id AS season_id,
+                m.id AS match_id,
+                m.home_club_id,
+                m.away_club_id,
+
+                fd.gross_revenue,
+                fd.net_revenue,
+                fd.attendance
+
+            FROM competitions c
+            JOIN seasons s
+                ON s.competition_id = c.id
+            JOIN matches m
+                ON m.season_id = s.id
+            LEFT JOIN financial_data fd
+                ON fd.match_id = m.id
+        ),
+
+        competition_teams AS (
+            SELECT
+                competition_id,
+                home_club_id AS club_id
+            FROM competition_matches
+
+            UNION
+
+            SELECT
+                competition_id,
+                away_club_id AS club_id
+            FROM competition_matches
+        ),
+
+        competition_team_counts AS (
+            SELECT
+                competition_id,
+                COUNT(DISTINCT club_id) AS total_teams
+            FROM competition_teams
+            GROUP BY competition_id
+        ),
+
+        competition_seasons AS (
+            SELECT
+                competition_id,
+                jsonb_agg(
+                    name ORDER BY name
+                ) AS seasons
+            FROM seasons
+            GROUP BY competition_id
+        ),
+
+        competition_summary AS (
+            SELECT
+                c.id::text AS id,
+                c.name,
+                c.slug,
+
+                COUNT(cm.match_id) AS total_matches,
+
+                COALESCE(SUM(cm.attendance), 0)
+                    AS total_attendance,
+
+                COALESCE(ct.total_teams, 0)
+                    AS total_teams,
+
+                COALESCE(SUM(cm.net_revenue), 0)
+                    AS total_revenue,
+
+                COALESCE(SUM(cm.gross_revenue), 0)
+                    AS gross_revenue,
+
+                COALESCE(AVG(cm.attendance), 0)
+                    AS average_attendance,
+
+                COALESCE(
+                    SUM(cm.net_revenue) * 100.0 /
+                    NULLIF(SUM(cm.gross_revenue), 0),
+                    0
+                ) AS retention_margin,
+
+                COALESCE(cs.seasons, '[]'::jsonb)
+                    AS seasons
+
+            FROM competitions c
+
+            LEFT JOIN competition_matches cm
+                ON cm.competition_id = c.id
+
+            LEFT JOIN competition_team_counts ct
+                ON ct.competition_id = c.id
+
+            LEFT JOIN competition_seasons cs
+                ON cs.competition_id = c.id
+
+            GROUP BY
+                c.id,
+                c.name,
+                c.slug,
+                ct.total_teams,
+                cs.seasons
+        )
+
+        SELECT
+            (SELECT COUNT(*) FROM clubs),
+            (SELECT COUNT(*) FROM matches),
+            (SELECT COUNT(*) FROM competitions),
+            (SELECT COUNT(*) FROM seasons),
+
+            fs.total_revenue,
+            fs.total_gross_revenue,
+            fs.total_attendance,
+
+            COALESCE(
+                fs.total_revenue * 100.0 /
+                NULLIF(fs.total_gross_revenue, 0),
+                0
+            ) AS total_retention,
+
+            fs.total_deficit_matches,
+
+            COALESCE(
+                (
+                    SELECT jsonb_agg(
+                        jsonb_build_object(
+                            'id', cs.id,
+                            'name', cs.name,
+                            'slug', cs.slug,
+                            'total_matches', cs.total_matches,
+                            'total_attendance', cs.total_attendance,
+                            'total_teams', cs.total_teams,
+                            'total_revenue', cs.total_revenue,
+                            'gross_revenue', cs.gross_revenue,
+                            'average_attendance', cs.average_attendance,
+                            'retention_margin', cs.retention_margin,
+                            'seasons', cs.seasons,
+                            'matches', '[]'::jsonb
+                        )
+                        ORDER BY cs.name
+                    )
+                    FROM competition_summary cs
+                ),
+                '[]'::jsonb
+            ) AS competitions
+
+        FROM financial_summary fs
+    `
+
+	err := r.db.QueryRow(ctx, query).Scan(
 		&stats.TotalTeams,
 		&stats.TotalMatches,
 		&stats.TotalCompetitions,
 		&stats.TotalSeasons,
+		&stats.TotalRevenue,
+		&stats.TotalGrossRevenue,
+		&stats.TotalAttendance,
+		&stats.TotalRetention,
+		&stats.TotalDeficitMatches,
+		&competitionsJSON,
 	)
+
 	if err != nil {
 		return competition.GeneralStats{},
 			fmt.Errorf("query general stats: %w", err)
+	}
+
+	if err := json.Unmarshal(
+		competitionsJSON,
+		&stats.Competitions,
+	); err != nil {
+		return competition.GeneralStats{},
+			fmt.Errorf("decode competition stats: %w", err)
 	}
 
 	return stats, nil
