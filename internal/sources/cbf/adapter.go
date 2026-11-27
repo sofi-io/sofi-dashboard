@@ -4,21 +4,22 @@ import (
 	"context"
 	"fmt"
 	"net/url"
-	"strconv"
-	"strings"
 
 	canonical "github.com/sofi-io/sofi-dashboard/internal/competition"
+	"github.com/sofi-io/sofi-dashboard/internal/sources/httpclient"
 )
 
-type Adapter struct {
-	client *Client
-}
-
-func NewAdapter(client *Client) *Adapter {
-	return &Adapter{client: client}
-}
-
 var _ canonical.Discoverer = (*Adapter)(nil)
+
+type Adapter struct {
+	client *httpclient.Client
+}
+
+func NewAdapter(client *httpclient.Client) *Adapter {
+	return &Adapter{
+		client: client,
+	}
+}
 
 func (a *Adapter) DiscoverCompetition(
 	ctx context.Context,
@@ -29,109 +30,156 @@ func (a *Adapter) DiscoverCompetition(
 		return nil, fmt.Errorf("CBF adapter client is not initialized")
 	}
 
-	discovery, err := a.client.DiscoverCompetition(
-		ctx,
-		competitionURL,
-		DiscoveryOptions{
-			MaxConcurrentClubFetches:  options.MaxConcurrentClubs,
-			MaxConcurrentMatchFetches: options.MaxConcurrentMatches,
-		},
-	)
+	competitionHTML, err := a.client.GetHTML(ctx, competitionURL, "")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetch CBF competition: %w", err)
 	}
 
-	externalID, season, err := cbfCompetitionIdentity(competitionURL)
+	// PARSING PROCESS
+	// +++++++++++++++
+	competition, err := ParseCompetition(competitionURL, competitionHTML)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("parse CBF competition: %w", err)
 	}
 
-	result := &canonical.Result{
-		Competition: canonical.Competition{
-			Source:     "cbf",
-			ExternalID: externalID,
-			Name:       discovery.Competition.Name,
-			Season:     season,
-			URL:        competitionURL,
-		},
-		Clubs:    make([]canonical.Club, 0, len(discovery.Clubs)),
-		Phases:   make([]canonical.Phase, 0),
-		Matches:  make([]canonical.Match, 0, len(discovery.Matches)),
-		Warnings: make([]canonical.Warning, 0, len(discovery.Warnings)),
+	clubs, err := ParseClubs(competitionURL, competitionHTML)
+	if err != nil {
+		return nil, fmt.Errorf("parse CBF clubs: %w", err)
 	}
 
-	for _, club := range discovery.Clubs {
-		result.Clubs = append(result.Clubs, canonical.Club{
-			ExternalID: club.ExternalID,
-			Name:       club.Name,
-			URL:        club.URL,
-		})
+	phases, err := ParsePhases(competitionURL, competitionHTML)
+	if err != nil {
+		return nil, fmt.Errorf("parse CBF phases: %w", err)
 	}
 
-	for _, match := range discovery.Matches {
-		result.Matches = append(result.Matches, canonical.Match{
-			ExternalID: match.ExternalID,
-			URL:        match.URL,
-			Status:     canonical.MatchStatus(match.Status),
-			Documents:  convertDocuments(match.Documents),
-		})
+	matches, err := a.discoverMatches(ctx, clubs)
+	if err != nil {
+		return nil, fmt.Errorf("discover CBF matches: %w", err)
 	}
 
-	for _, warning := range discovery.Warnings {
-		entityID := warning.MatchID
-		if entityID == "" {
-			entityID = warning.ClubID
-		}
-
-		result.Warnings = append(result.Warnings, canonical.Warning{
-			Stage:    warning.Stage,
-			EntityID: entityID,
-			URL:      warning.URL,
-			Error:    warning.Error,
-		})
+	if err := a.discoverMatchDetails(ctx, matches, phases); err != nil {
+		return nil, fmt.Errorf("discover CBF match details: %w", err)
 	}
 
-	return result, nil
+	return &canonical.Result{
+		Competition: competition,
+		Clubs:       clubs,
+		Phases:      phases,
+		Matches:     matches,
+	}, nil
 }
 
-func cbfCompetitionIdentity(rawURL string) (string, string, error) {
-	u, err := url.Parse(rawURL)
-	if err != nil {
-		return "", "", fmt.Errorf("parse CBF competition URL: %w", err)
-	}
+func (a *Adapter) discoverMatches(
+	ctx context.Context,
+	clubs []canonical.Club,
+) ([]canonical.Match, error) {
+	matches := make([]canonical.Match, 0)
+	seen := make(map[string]struct{})
 
-	if u.Host == "" {
-		return "", "", fmt.Errorf("CBF competition URL has no host")
-	}
+	for _, club := range clubs {
+		if club.URL == "" {
+			return nil, fmt.Errorf(
+				"missing URL for club %s",
+				club.ExternalID,
+			)
+		}
 
-	segments := strings.Split(strings.Trim(u.Path, "/"), "/")
+		clubURL, err := url.Parse(club.URL)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"parse club URL: %w",
+				err,
+			)
+		}
 
-	if len(segments) == 0 || segments[0] == "" {
-		return "", "", fmt.Errorf("CBF competition URL has no path identifier")
-	}
+		query := clubURL.Query()
+		query.Set("tab", "historico-de-partidas")
+		clubURL.RawQuery = query.Encode()
 
-	last := segments[len(segments)-1]
+		clubHTML, err := a.client.GetHTML(
+			ctx,
+			clubURL.String(),
+			club.URL,
+		)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"fetch matches for club %s: %w",
+				club.ExternalID,
+				err,
+			)
+		}
 
-	if len(segments) >= 2 {
-		if year, err := strconv.Atoi(last); err == nil &&
-			year >= 1900 && year <= 2200 {
-			return segments[len(segments)-2], last, nil
+		clubMatches, err := ParseMatches(
+			clubURL.String(),
+			clubHTML,
+		)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"parse matches for club %s: %w",
+				club.ExternalID,
+				err,
+			)
+		}
+
+		for _, match := range clubMatches {
+			if _, exists := seen[match.ExternalID]; exists {
+				continue
+			}
+
+			seen[match.ExternalID] = struct{}{}
+			matches = append(matches, match)
 		}
 	}
 
-	return last, "", nil
+	return matches, nil
 }
 
-func convertDocuments(documents []Document) []canonical.Document {
-	result := make([]canonical.Document, 0, len(documents))
+func (a *Adapter) discoverMatchDetails(
+	ctx context.Context,
+	matches []canonical.Match,
+	phases []canonical.Phase,
+) error {
+	for i := range matches {
+		matchURL, err := url.Parse(matches[i].URL)
+		if err != nil {
+			return fmt.Errorf(
+				"parse match URL: %w",
+				err,
+			)
+		}
 
-	for _, document := range documents {
-		result = append(result, canonical.Document{
-			Type:   canonical.DocumentType(document.Type),
-			URL:    document.URL,
-			Status: canonical.DocumentStatus(document.Status),
-		})
+		query := matchURL.Query()
+		query.Set("view", "documentos")
+		matchURL.RawQuery = query.Encode()
+
+		content, err := a.client.GetHTML(
+			ctx,
+			matchURL.String(),
+			matches[i].URL,
+		)
+		if err != nil {
+			return fmt.Errorf(
+				"fetch match %s details: %w",
+				matches[i].ExternalID,
+				err,
+			)
+		}
+
+		updatedMatch, err := ParseMatchDetails(
+			matches[i],
+			phases,
+			content,
+		)
+		if err != nil {
+			return fmt.Errorf(
+				"parse match %s details: %w",
+				matches[i].ExternalID,
+				err,
+			)
+		}
+
+		matches[i] = updatedMatch
 	}
 
-	return result
+	return nil
 }

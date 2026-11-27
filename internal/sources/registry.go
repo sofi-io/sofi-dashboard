@@ -7,12 +7,17 @@ import (
 	canonical "github.com/sofi-io/sofi-dashboard/internal/competition"
 	"github.com/sofi-io/sofi-dashboard/internal/sources/cbf"
 	"github.com/sofi-io/sofi-dashboard/internal/sources/fpf"
+	"github.com/sofi-io/sofi-dashboard/internal/sources/httpclient"
 )
 
 func NewDiscoverer(source string) (canonical.Discoverer, error) {
 	switch strings.ToLower(strings.TrimSpace(source)) {
 	case "cbf":
-		client := cbf.NewClient()
+		client, err := httpclient.NewClient(httpclient.ClientConfig{})
+		if err != nil {
+			return nil, fmt.Errorf("initialize CBF client: %w", err)
+		}
+
 		return cbf.NewAdapter(client), nil
 
 	case "fpf":
