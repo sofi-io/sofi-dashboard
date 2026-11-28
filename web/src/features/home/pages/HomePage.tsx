@@ -5,6 +5,8 @@ import type {
   CompetitionStats
 } from '../../../types/financial'
 
+import { CompetitionRanking } from './CompetitionRanking'
+
 function StatsCard({ stats }: { stats: GeneralStats | null }) {
   if (!stats) {
     return null
@@ -21,8 +23,6 @@ function StatsCard({ stats }: { stats: GeneralStats | null }) {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     })
-
-console.log('Valor formatado:', grossRevenueFormatted)
 
   return (
     <div className="w-full rounded-2xl bg-sofi-midnight font-sans">
@@ -502,6 +502,12 @@ export function HomePage() {
       <StatsSection stats={stats} />
 
       <DetailsSection stats={stats} />
+
+      <CompetitionRanking
+        competitions={stats?.competitions ?? []}
+        history={stats?.competition_history ?? []}
+        selectedSeason={selectedSeason}
+      />
 
       <CompetitionsSection competitions={stats?.competitions || []} />
     </main>

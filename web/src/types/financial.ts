@@ -11,6 +11,7 @@ export interface GeneralStats {
     total_deficit_matches: number
 
     competitions: CompetitionStats[]
+    competition_history: CompetitionSeasonStats[]
 }
 
 export interface CompetitionStats {
@@ -43,6 +44,23 @@ export interface MatchStats {
     gross_revenue: number
     attendance: number
     retention_margin: number
+
+    total_revenue?: number
+    match_date?: string
+}
+
+export type CompetitionSeasonStats = {
+    competition_id: string
+    competition_name: string
+    season: string
+
+    gross_revenue: number
+    total_revenue: number
+    total_attendance: number
+    average_attendance: number
+    retention_margin: number
+    total_matches: number
+    total_deficit_matches: number
 }
 
 export interface ClubStats {
