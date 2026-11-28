@@ -414,7 +414,7 @@ function SeasonSelector({
         }}
         className="flex cursor-pointer items-center gap-2 border-none bg-transparent py-2 font-sans text-base font-medium text-gray-500 outline-none transition-colors hover:text-sofi-midnight focus-visible:text-sofi-blue"
       >
-        Temporada {selectedSeason}
+        {selectedSeason === 'Consolidado' ? 'Todas as temporadas' : `Temporada ${selectedSeason}`}
 
         <svg
           className={`h-3 w-3 transition-transform duration-200 ${
@@ -452,7 +452,7 @@ function SeasonSelector({
                   : 'text-gray-500'
               }`}
             >
-              Temporada {season}
+              {season === 'Consolidado' ? 'Todas as temporadas' : `Temporada ${season}`}
             </button>
           ))}
         </div>
@@ -494,7 +494,7 @@ export function HomePage() {
     <main className="bg-sofi-white">
       <div className="flex w-full justify-end">
         <SeasonSelector
-          seasons={['2026', '2025', '2024', '2023', '2022']}
+          seasons={['Consolidado', '2026', '2025', '2024', '2023', '2022']}
           selectedSeason={selectedSeason}
           onChange={setSelectedSeason}
         />
