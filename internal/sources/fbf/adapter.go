@@ -63,6 +63,13 @@ func (a *Adapter) DiscoverCompetition(
 		)
 	}
 
+	if err := a.discoverDocuments(ctx, matches); err != nil {
+		return nil, fmt.Errorf(
+			"failed to discover match documents: %w",
+			err,
+		)
+	}
+
 	return &canonical.Result{
 		Competition: competition,
 		Clubs:       clubs,
@@ -146,5 +153,34 @@ func (a *Adapter) discoverPhases(ctx context.Context, competitionURL string, pha
 }
 
 func (a *Adapter) discoverDocuments(ctx context.Context, matches []canonical.Match) error {
+	for i := range matches {
+		if matches[i].Status != canonical.MatchCompleted {
+			continue
+		}
+
+		content, err := a.client.GetHTML(
+			ctx,
+			matches[i].URL,
+			"",
+		)
+		if err != nil {
+			return fmt.Errorf(
+				"fetch match documents for %s: %w",
+				matches[i].ExternalID,
+				err,
+			)
+		}
+
+		documents, err := ParseDocuments(matches[i].URL, content)
+		if err != nil {
+			return fmt.Errorf(
+				"parse match documents for %s: %w",
+				matches[i].ExternalID,
+				err,
+			)
+		}
+
+		matches[i].Documents = documents
+	}
 	return nil
 }

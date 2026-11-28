@@ -6,6 +6,7 @@ import (
 
 	canonical "github.com/sofi-io/sofi-dashboard/internal/competition"
 	"github.com/sofi-io/sofi-dashboard/internal/sources/cbf"
+	"github.com/sofi-io/sofi-dashboard/internal/sources/fbf"
 	"github.com/sofi-io/sofi-dashboard/internal/sources/fpf"
 	"github.com/sofi-io/sofi-dashboard/internal/sources/httpclient"
 )
@@ -27,6 +28,14 @@ func NewDiscoverer(source string) (canonical.Discoverer, error) {
 		}
 
 		return fpf.NewAdapter(client), nil
+
+	case "fbf":
+		client, err := httpclient.NewClient(httpclient.ClientConfig{})
+		if err != nil {
+			return nil, fmt.Errorf("initialize FBF client: %w", err)
+		}
+
+		return fbf.NewAdapter(client), nil
 
 	default:
 		return nil, fmt.Errorf(

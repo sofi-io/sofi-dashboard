@@ -338,7 +338,7 @@ func ParseMatches(phaseURL string, rawHTML string, phase canonical.Phase) ([]can
 					}
 
 					parts := strings.Split(strings.Trim(parsedURL.Path, "/"), "/")
-					if len(parts) != 3 || parts[0] != "jogo" || parts[1] == "detalhes" {
+					if len(parts) != 3 || parts[0] != "jogo" || parts[1] != "detalhes" {
 						parseError = fmt.Errorf(
 							"invalid match URL format: %s",
 							matchURL,
