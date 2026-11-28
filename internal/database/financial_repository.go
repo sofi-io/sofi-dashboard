@@ -503,6 +503,7 @@ const filteredSeasonCTE = `
             m.season_id,
             m.home_club_id,
             m.away_club_id,
+			m.kickoff_at,
             s.competition_id
         FROM matches m
         JOIN filtered_seasons s
@@ -825,6 +826,7 @@ func (r *CompetitionFinancialRepository) GetGeneralStats(
 	ctx context.Context,
 	seasonName string,
 ) (competition.GeneralStats, error) {
+
 	if r == nil || r.db == nil {
 		return competition.GeneralStats{},
 			fmt.Errorf("financial repository is not initialized")
@@ -855,12 +857,122 @@ func (r *CompetitionFinancialRepository) GetGeneralStats(
 		ctx,
 		seasonName,
 	)
+	if err != nil {
+		return competition.GeneralStats{}, err
+	}
 
+	// Competition history
+	history, err := r.getCompetitionHistory(ctx)
 	if err != nil {
 		return competition.GeneralStats{}, err
 	}
 
 	stats.Competitions = competitions
+	stats.CompetitionHistory = history
 
 	return stats, nil
+}
+
+func (r *CompetitionFinancialRepository) getCompetitionHistory(
+	ctx context.Context,
+) ([]competition.CompetitionSeasonStats, error) {
+
+	const query = filteredSeasonCTE + financialDataCTE + `
+
+		SELECT
+			c.id::text,
+			c.name,
+			s.name AS season,
+
+			COALESCE(SUM(fd.gross_revenue), 0)
+				AS gross_revenue,
+
+			COALESCE(SUM(fd.net_revenue), 0)
+				AS total_revenue,
+
+			COALESCE(SUM(fd.attendance), 0)
+				AS total_attendance,
+
+			COALESCE(AVG(fd.attendance), 0)
+				AS average_attendance,
+
+			COALESCE(
+				SUM(fd.net_revenue) * 100.0 /
+				NULLIF(SUM(fd.gross_revenue), 0),
+				0
+			) AS retention_margin,
+
+			COUNT(m.id) AS total_matches,
+
+			COUNT(*) FILTER (
+				WHERE fd.net_revenue < 0
+			) AS total_deficit_matches
+
+		FROM filtered_matches m
+
+		JOIN filtered_seasons s
+			ON s.id = m.season_id
+
+		JOIN competitions c
+			ON c.id = m.competition_id
+
+		LEFT JOIN financial_data fd
+			ON fd.match_id = m.id
+
+		GROUP BY
+			c.id,
+			c.name,
+			s.name
+
+		HAVING COUNT(fd.match_id) > 0
+
+		ORDER BY
+			s.name,
+			c.name,
+			c.id
+	`
+
+	rows, err := r.db.Query(ctx, query, "")
+	if err != nil {
+		return nil, fmt.Errorf(
+			"query competition history: %w", err,
+		)
+	}
+
+	defer rows.Close()
+
+	items := make([]competition.CompetitionSeasonStats, 0)
+
+	for rows.Next() {
+		var item competition.CompetitionSeasonStats
+
+		err := rows.Scan(
+			&item.CompetitionID,
+			&item.CompetitionName,
+			&item.Season,
+			&item.GrossRevenue,
+			&item.TotalRevenue,
+			&item.TotalAttendance,
+			&item.AverageAttendance,
+			&item.RetentionMargin,
+			&item.TotalMatches,
+			&item.TotalDeficitMatches,
+		)
+
+		if err != nil {
+			return nil, fmt.Errorf(
+				"scan competition history: %w", err,
+			)
+		}
+
+		items = append(items, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf(
+			"iterate competition history: %w", err,
+		)
+	}
+
+	return items, nil
 }

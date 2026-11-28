@@ -122,7 +122,8 @@ type GeneralStats struct {
 	TotalRetention      float64 `json:"total_retention"`
 	TotalDeficitMatches int     `json:"total_deficit_matches"`
 
-	Competitions []CompetitionStats `json:"competitions"`
+	Competitions       []CompetitionStats       `json:"competitions"`
+	CompetitionHistory []CompetitionSeasonStats `json:"competition_history"`
 }
 
 type CompetitionStats struct {
@@ -145,8 +146,9 @@ type CompetitionStats struct {
 }
 
 type MatchStats struct {
-	ID   string `json:"id"`
-	Slug string `json:"slug"`
+	ID        string `json:"id"`
+	Slug      string `json:"slug"`
+	MatchDate string `json:"match_date,omitempty"`
 
 	HomeTeam string `json:"home_team"`
 	AwayTeam string `json:"away_team"`
@@ -154,6 +156,7 @@ type MatchStats struct {
 	AwayLogo string `json:"away_logo,omitempty"`
 
 	GrossRevenue    float64 `json:"gross_revenue"`
+	TotalRevenue    float64 `json:"total_revenue"`
 	Attendance      int     `json:"attendance"`
 	RetentionMargin float64 `json:"retention_margin"`
 }
@@ -170,4 +173,18 @@ type ClubStats struct {
 	RetentionMargin   float64 `json:"retention_margin"`
 
 	Matches []MatchStats `json:"matches"`
+}
+
+type CompetitionSeasonStats struct {
+	CompetitionID   string `json:"competition_id"`
+	CompetitionName string `json:"competition_name"`
+	Season          string `json:"season"`
+
+	GrossRevenue        float64 `json:"gross_revenue"`
+	TotalRevenue        float64 `json:"total_revenue"`
+	TotalAttendance     int     `json:"total_attendance"`
+	AverageAttendance   float64 `json:"average_attendance"`
+	RetentionMargin     float64 `json:"retention_margin"`
+	TotalMatches        int     `json:"total_matches"`
+	TotalDeficitMatches int     `json:"total_deficit_matches"`
 }
