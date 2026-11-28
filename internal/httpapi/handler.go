@@ -312,6 +312,9 @@ func (h *Handler) getFinancialOverview(
 	r *http.Request,
 ) {
 	seasonName := strings.TrimSpace(r.URL.Query().Get("season"))
+	if seasonName == "Consolidado" {
+		seasonName = ""
+	}
 
 	overview, err := h.financial.GetGeneralStats(r.Context(), seasonName)
 	if err != nil {
