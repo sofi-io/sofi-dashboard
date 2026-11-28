@@ -398,7 +398,7 @@ export function CompetitionRanking({
                     />
 
                     <Tooltip
-                      cursor={{ fill: '#F9FAFB' }}
+                      cursor={{ fill: '#FAF9F6', stroke: '#FAF9F6' }}
                       formatter={(value) =>
                         formatValue(Number(value), metric)
                       }
