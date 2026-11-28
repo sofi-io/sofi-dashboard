@@ -3,6 +3,7 @@ package fbf
 import (
 	"fmt"
 	"net/url"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -31,37 +32,6 @@ func resolveURL(baseURL, targetURL string) (string, error) {
 
 	resolved := base.ResolveReference(target)
 	return resolved.String(), nil
-}
-
-func extractClubCodes(
-	doc *goquery.Document,
-) map[string]string {
-	codes := make(map[string]string)
-
-	doc.Find("#carouselExample .flex-confronto-card").Each(
-		func(_ int, selection *goquery.Selection) {
-			teams := selection.Find(".time-confronto")
-			logos := selection.Find("img")
-
-			if teams.Length() != 2 || logos.Length() != 2 {
-				return
-			}
-
-			for i := 0; i < 2; i++ {
-				code := strings.TrimSpace(
-					teams.Eq(i).Text(),
-				)
-
-				logo, exists := logos.Eq(i).Attr("src")
-
-				if exists && code != "" {
-					codes[logo] = code
-				}
-			}
-		},
-	)
-
-	return codes
 }
 
 func ParseCompetition(competitionURL string, rawHTML string) (canonical.Competition, error) {
@@ -202,8 +172,6 @@ func ParseClubs(competitionURL string, rawHTML string) ([]canonical.Club, error)
 		)
 	}
 
-	codes := extractClubCodes(doc)
-
 	clubs := make([]canonical.Club, 0)
 	seen := make(map[string]struct{})
 
@@ -229,8 +197,8 @@ func ParseClubs(competitionURL string, rawHTML string) ([]canonical.Club, error)
 				return false // break
 			}
 
-			clubID, exists := codes[logo]
-			if !exists {
+			clubID, err := extractClubID(logo)
+			if err != nil {
 				parseError = fmt.Errorf(
 					"missing club code for logo %s in HTML for URL: %s",
 					logo,
@@ -352,17 +320,48 @@ func ParseMatches(phaseURL string, rawHTML string, phase canonical.Phase) ([]can
 						return true // continue
 					}
 
-					teams := matchSelection.Find(".time-confronto")
-					if teams.Length() != 2 {
+					logos := matchSelection.Find(
+						".flex-confronto-card img",
+					)
+
+					if logos.Length() != 2 {
 						parseError = fmt.Errorf(
-							"invalid number of teams in HTML for match URL: %s",
-							matchURL,
+							"invalid clubs for match %s",
+							matchID,
 						)
-						return false // break
+						return false
 					}
 
-					homeID := strings.TrimSpace(teams.First().Text())
-					awayID := strings.TrimSpace(teams.Last().Text())
+					homeLogo, homeExists := logos.First().Attr("src")
+					awayLogo, awayExists := logos.Last().Attr("src")
+
+					if !homeExists || !awayExists {
+						parseError = fmt.Errorf(
+							"missing club logos for match %s",
+							matchID,
+						)
+						return false
+					}
+
+					homeID, err := extractClubID(homeLogo)
+					if err != nil {
+						parseError = err
+						return false
+					}
+
+					awayID, err := extractClubID(awayLogo)
+					if err != nil {
+						parseError = err
+						return false
+					}
+
+					if homeID == awayID {
+						parseError = fmt.Errorf(
+							"conflicting club identifiers for match %s",
+							matchID,
+						)
+						return false
+					}
 
 					if homeID == "" || awayID == "" {
 						parseError = fmt.Errorf(
@@ -596,4 +595,19 @@ func parseDocumentType(title string) (canonical.DocumentType, bool) {
 	default:
 		return "", false
 	}
+}
+
+func extractClubID(logoURL string) (string, error) {
+	parsedURL, err := url.Parse(logoURL)
+	if err != nil {
+		return "", fmt.Errorf("parse club logo URL: %w", err)
+	}
+
+	id := path.Base(parsedURL.Path)
+
+	if id == "" || id == "." || id == "/" {
+		return "", fmt.Errorf("invalid club logo: %s", logoURL)
+	}
+
+	return id, nil
 }
