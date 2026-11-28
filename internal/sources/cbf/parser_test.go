@@ -1,84 +1,145 @@
 package cbf
 
 import (
+	"os"
 	"testing"
+
+	canonical "github.com/sofi-io/sofi-dashboard/internal/competition"
 )
 
-func TestParseClubsDeduplicates(t *testing.T) {
-	html := `
-	<a href="/futebol-brasileiro/times/serie-b/2026/20023">
-		<span>Náutico</span>
-	</a>
-	<a href="/futebol-brasileiro/times/serie-b/2026/20023">
-		<span>Náutico</span>
-	</a>
-	<a href="/futebol-brasileiro/times/serie-b/2026/20010">
-		<span>Outro Clube</span>
-	</a>
-	`
-
-	clubs, err := ParseClubs("https://www.cbf.com.br", html)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(clubs) != 2 {
-		t.Fatalf("got %d clubs, want 2", len(clubs))
-	}
-
-	if clubs[0].ExternalID != "20023" {
-		t.Errorf("unexpected club ID: %s", clubs[0].ExternalID)
-	}
-}
-
 func TestParseMatches(t *testing.T) {
-	html := `
-	<a href="/futebol-brasileiro/jogos/serie-b/2026/londrina-x-nautico/833285">
-		Londrina x Náutico
-	</a>
-	<a href="/futebol-brasileiro/jogos/serie-b/2026/londrina-x-nautico/833285">
-		Londrina x Náutico
-	</a>
-	`
-
-	matches, err := ParseMatches("https://www.cbf.com.br", html)
+	content, err := os.ReadFile("../../../club.html")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if len(matches) != 1 {
-		t.Fatalf("got %d matches, want 1", len(matches))
+	const clubURL = "https://www.cbf.com.br/futebol-brasileiro/times/campeonato-brasileiro/serie-b/2026/20023"
+
+	matches, err := ParseMatches(
+		clubURL,
+		string(content),
+	)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	if matches[0].ExternalID != "833285" {
-		t.Errorf("unexpected match ID: %s", matches[0].ExternalID)
+	if len(matches) != 38 {
+		t.Fatalf(
+			"expected 38 matches, got %d",
+			len(matches),
+		)
+	}
+
+	match := matches[0]
+
+	if match.ExternalID != "833285" {
+		t.Errorf("unexpected match ID: %s", match.ExternalID)
+	}
+
+	if match.Round != 38 {
+		t.Errorf("unexpected round: %d", match.Round)
+	}
+
+	if match.HomeClubExternalID != "62726" {
+		t.Error("unexpected home club")
+	}
+
+	if match.AwayClubExternalID != "20023" {
+		t.Error("unexpected away club")
+	}
+
+	if match.HomeScore == nil || *match.HomeScore != 2 {
+		t.Error("unexpected home score")
+	}
+
+	if match.AwayScore == nil || *match.AwayScore != 1 {
+		t.Error("unexpected away score")
+	}
+
+	if match.Status != canonical.MatchCompleted {
+		t.Error("unexpected match status")
+	}
+
+	if match.URL == "" {
+		t.Error("empty match URL")
 	}
 }
 
-func TestParseDocuments(t *testing.T) {
-	html := `
-	<a href="https://conteudo.cbf.com.br/sumulas/2026/242374se.pdf">
-		Súmula
-	</a>
-	<a href="https://conteudo.cbf.com.br/sumulas/2026/242374b.pdf">
-		Boletim Financeiro
-	</a>
-	<a href="https://conteudo.cbf.com.br/sumulas/2026/242374rdj.pdf">
-		Relatório de Jogo
-	</a>
-	`
-
-	documents, err := ParseDocuments("https://www.cbf.com.br", html)
+func TestParseMatchDetails(t *testing.T) {
+	content, err := os.ReadFile("../../../match.html")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if len(documents) != 3 {
-		t.Fatalf("got %d documents, want 3", len(documents))
+	match := canonical.Match{
+		ExternalID: "833285",
 	}
 
-	if documents[1].Type != DocumentFinancialBulletin {
-		t.Errorf("expected financial bulletin, got %s",
-			documents[1].Type)
+	phases := []canonical.Phase{
+		{
+			ExternalID: "2009",
+			Name:       "1ª Fase",
+			Order:      1,
+		},
+		{
+			ExternalID: "2010",
+			Name:       "Playoff de Acesso",
+			Order:      2,
+		},
+	}
+
+	result, err := ParseMatchDetails(
+		match,
+		phases,
+		string(content),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if result.PhaseExternalID != "2009" {
+		t.Errorf(
+			"unexpected phase ID: %s",
+			result.PhaseExternalID,
+		)
+	}
+
+	if result.PhaseName != "1ª Fase" {
+		t.Errorf(
+			"unexpected phase name: %s",
+			result.PhaseName,
+		)
+	}
+
+	if len(result.Documents) != 3 {
+		t.Fatalf(
+			"expected 3 documents, got %d",
+			len(result.Documents),
+		)
+	}
+
+	foundFinancialBulletin := false
+
+	for _, document := range result.Documents {
+		if document.Status != canonical.DocumentDiscovered {
+			t.Errorf("unexpected document status")
+		}
+
+		if document.Type == canonical.DocumentFinancialBulletin {
+			foundFinancialBulletin = true
+
+			expectedURL := "https://conteudo.cbf.com.br/sumulas/2026/242374b.pdf"
+
+			if document.URL != expectedURL {
+				t.Errorf(
+					"unexpected financial bulletin URL: %s",
+					document.URL,
+				)
+			}
+		}
+	}
+
+	if !foundFinancialBulletin {
+		t.Error("financial bulletin not found")
 	}
 }

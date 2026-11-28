@@ -37,6 +37,7 @@ const (
 type Match struct {
 	ExternalID string `json:"external_id"`
 	URL        string `json:"url"`
+	Slug       string `json:"slug,omitempty"`
 
 	PhaseExternalID string `json:"phase_external_id,omitempty"`
 	PhaseName       string `json:"phase_name,omitempty"`
